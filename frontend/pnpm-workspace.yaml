@@ -1,4 +1,4 @@
-allowBuilds:
-  esbuild: set this to true or false
+# esbuild ships a platform binary as an optional dependency; pnpm still runs its
+# install script, so it must be listed as an allowed build dependency.
 onlyBuiltDependencies:
   - esbuild

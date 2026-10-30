@@ -1,0 +1,69 @@
+# Render Blueprint（可选）：一份声明式的免费 Web Service 配置。
+# 说明：
+#   * 免费实例闲置约 15 分钟后休眠，唤醒需要时间；容器本地文件不持久，所以业务数据必须放 Neon。
+#   * DATABASE_URL / AI_API_KEY 不写入仓库，创建 Blueprint 时手工粘贴到控制台。
+#   * ADMIN_TOKEN 由平台生成，之后在 Render 控制台 Environment 中查看，不要写进文档或聊天记录。
+#   * 首版固定 1 个 worker：多 worker 需要先补数据库锁与并发方案。
+services:
+  - type: web
+    name: timesync
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Neon 连接串（建议使用 pooler 地址，末尾带 sslmode=require）
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DB_MAX_OVERFLOW
+        value: "5"
+      - key: DB_POOL_RECYCLE
+        value: "1800"
+      # 关闭原始演示凭据入口与永久令牌，改用短时沙箱会话与设备凭据
+      - key: DEMO_MODE
+        value: "false"
+      - key: LEGACY_TOKEN_AUTH
+        value: "false"
+      - key: SANDBOX_MODE
+        value: "true"
+      - key: SANDBOX_SESSION_TTL_MINUTES
+        value: "180"
+      - key: SANDBOX_MAX_ACTIVE_SESSIONS
+        value: "40"
+      - key: DEVICE_TOKEN_TTL_DAYS
+        value: "7"
+      - key: ADMIN_TOKEN
+        generateValue: true
+      # MiMo：Key 只放平台 Secret
+      - key: AI_PROVIDER
+        value: mimo
+      - key: AI_BASE_URL
+        value: https://api.xiaomimimo.com/v1
+      - key: AI_MODEL
+        value: mimo-v2.6-pro
+      - key: AI_API_KEY
+        sync: false
+      # 费用与体积保护
+      - key: AI_BUDGET_ENABLED
+        value: "true"
+      - key: AI_DAILY_BUDGET
+        value: "20"
+      - key: AI_ACTOR_DAILY_BUDGET
+        value: "5"
+      - key: AI_MAX_CONCURRENCY
+        value: "1"
+      - key: MAX_REQUEST_BYTES
+        value: "8388608"
+      - key: AUTO_MIGRATE
+        value: "true"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: TZ
+        value: Asia/Shanghai

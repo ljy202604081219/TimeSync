@@ -1,0 +1,44 @@
+# 构建上下文排除项：密钥、数据库、令牌、依赖目录和私人材料都不能进镜像。
+.git
+.gitignore
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.idea
+.vscode
+.DS_Store
+
+# 本机运行数据与秘密
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.backup-*
+.demo-tokens.json
+backend/.demo-tokens.json
+backups/
+data/
+
+# 前端依赖与构建产物（dist 由构建阶段生成）
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# 文档中的大图与验证截图不参与镜像
+docs/*.png
+docs/contracts
+验证截图
+
+# 测试与本地产物
+.pytest_cache
+.timesync-requirements.sha256
+*.log
+*.zip

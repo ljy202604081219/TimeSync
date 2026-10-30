@@ -24,6 +24,9 @@ def main():
     parser.add_argument('--check',action='store_true',help='Run pytest and the production build, then exit')
     parser.add_argument('--python',help='Use an existing project Python environment')
     parser.add_argument('--port',type=int,default=8000)
+    parser.add_argument('--host',default='127.0.0.1',
+                        help='Bind address. Keep 127.0.0.1 unless an ESP32 on the same trusted LAN must reach this machine; '
+                             '0.0.0.0 exposes the service to the whole local network.')
     parser.add_argument('--no-browser',action='store_true')
     args=parser.parse_args()
     node=shutil.which('node')
@@ -65,7 +68,10 @@ def main():
         print('TimeSync: backend tests, TypeScript and production build passed.')
         return
     print(f'TimeSync: http://127.0.0.1:{args.port} | API: /docs | Ctrl+C to stop',flush=True)
-    server=subprocess.Popen([str(p) for p in [python,'-m','uvicorn','app.main:app','--host','127.0.0.1','--port',args.port]],cwd=BACKEND)
+    if args.host not in ('127.0.0.1','localhost','::1'):
+        print(f'TimeSync: listening on {args.host}:{args.port}. Only use this on a trusted LAN so an ESP32 can reach '
+              'the machine; never expose it to the public internet.',flush=True)
+    server=subprocess.Popen([str(p) for p in [python,'-m','uvicorn','app.main:app','--host',args.host,'--port',args.port]],cwd=BACKEND)
     try:
         for _ in range(150):
             if server.poll() is not None: raise SystemExit('Backend failed to start. See the error above.')
