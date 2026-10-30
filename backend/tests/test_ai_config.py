@@ -48,11 +48,16 @@ def test_settings_require_admin_and_origin(system,config):
     assert client.get('/api/ai/settings').status_code==401
     assert call('POST','/api/ai/test-and-save',json={'base_url':'http://localhost.evil/v1','api_key':'test'}).status_code==400
     from app.main import local_ai_admin
+    from app.auth import Principal, WEB_SCOPES
     from starlette.requests import Request
     from types import SimpleNamespace
     from fastapi import HTTPException
     request=Request({'type':'http','client':('127.0.0.1',1),'server':('127.0.0.1',8000),'scheme':'http','path':'/','headers':[(b'origin',b'https://evil.example')]})
-    with pytest.raises(HTTPException): local_ai_admin(request,SimpleNamespace(id='A'))
+    # A sandbox session may never configure the model endpoint, even as member A.
+    sandbox=Principal(user=SimpleNamespace(id='A'),kind='session',scope=WEB_SCOPES)
+    with pytest.raises(HTTPException): local_ai_admin(request,sandbox)
+    workstation=Principal(user=SimpleNamespace(id='A'),kind='user',scope=WEB_SCOPES)
+    with pytest.raises(HTTPException): local_ai_admin(request,workstation)  # cross-origin
 
 def test_actual_mimo_payload_for_image(config,monkeypatch):
     monkeypatch.setenv('AI_API_KEY','private-test-credential')

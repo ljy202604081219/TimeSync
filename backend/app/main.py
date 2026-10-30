@@ -3,19 +3,25 @@ from pathlib import Path
 import os
 import json
 import hashlib
-from threading import RLock
 from fastapi import FastAPI, Depends, Header, HTTPException, UploadFile, File, Form, Request, Query, Response
 from typing import Annotated
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from .db import Base, engine, session, SessionLocal
+from . import ai_budget
+from . import auth as authn
+from . import config
+from . import devices
+from . import migrations
+from .db import engine, session, SessionLocal, backend_of, describe, schema_version, write_transaction
+from .middleware import BodySizeLimit
 from .models import User,Task,BusyInterval,Availability,PlanVersion,Disruption,RequestRecord
 from .schemas import TaskInput,BusyInput,AvailabilityInput,RangeInput,DisruptionInput
 from .plans import rows,latest,schedule_rows,compute,persist,serialize,valid_current,snapshot
 from .timeutil import dt,expand
 from .demo import seed
-from .schemas import CandidateInput,MeetingInput,ResponseInput
+from .schemas import CandidateInput,MeetingInput,ResponseInput,DeviceIssueInput,SandboxLoginInput
 from .models import Meeting,MeetingInvitation
 from .coordination import find_candidates,create_meeting,respond,public_meeting,invitations,meeting_alternatives
 from . import ai
@@ -26,30 +32,62 @@ from .intervals import overlap
 from .agenda import AgendaQuery, AgendaResponse, build_agenda
 from .school_time import profile as timetable_profile
 
-DEMO=os.getenv('DEMO_MODE','true').lower()=='true'
 TOKEN_FILE=Path(__file__).resolve().parents[1]/'.demo-tokens.json'
-write_lock=RLock()
+EXPECTED_SCHEMA=migrations.expected_version()
+
 
 @asynccontextmanager
 async def lifespan(app):
-    Base.metadata.create_all(engine)
-    if DEMO:
+    # Versioned, additive migrations only. Never drop_all() or reset data.
+    if config.auto_migrate():
+        migrations.ensure_schema(engine)
+    if config.demo_mode():
         with SessionLocal() as db:
             tokens=seed(db)
-            if tokens: TOKEN_FILE.write_text(json.dumps(tokens),encoding='utf8')
+            if tokens and backend_of(engine.url)=='sqlite':
+                TOKEN_FILE.write_text(json.dumps(tokens),encoding='utf8')
+            elif tokens:
+                # A container filesystem is not durable: cloud logins go through
+                # sandbox sessions or administrator-issued device credentials.
+                print('TimeSync: demo identities created. No token file is written on a '
+                      'server database; use /api/sandbox/sessions or app.bootstrap.')
     yield
 
 app = FastAPI(title='TimeSync 时聚', lifespan=lifespan)
+app.add_middleware(BodySizeLimit)
+
+
 @app.get('/api/health')
 def health():
+    """Liveness only: no database access, so it cannot flap during cold start."""
     return {'status':'ok', 'timezone':'Asia/Shanghai', 'slot_minutes':15}
 
-def auth(authorization: str=Header(default=''),db:Session=Depends(session)):
-    if not authorization.startswith('Bearer '): raise HTTPException(401,'请先登录演示成员或提供访问令牌')
-    digest=hashlib.sha256(authorization[7:].encode()).hexdigest()
-    user=db.scalar(select(User).where(User.token_hash==digest))
-    if not user: raise HTTPException(401,'访问令牌无效')
-    return user
+
+@app.get('/api/ready')
+def ready():
+    """Readiness: database reachable and schema at the expected version."""
+    info={'timezone':'Asia/Shanghai','expected_schema_version':EXPECTED_SCHEMA}
+    try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql('SELECT 1')
+            version=schema_version(conn)
+    except Exception:
+        # Never echo the DSN or driver exception text.
+        return JSONResponse({**info,'status':'error','database':'unavailable'},status_code=503)
+    info.update(status='ok' if version>=EXPECTED_SCHEMA else 'behind',database=describe(engine),schema_version=version)
+    if version<EXPECTED_SCHEMA:
+        info['next']='run "python -m app.migrate"'
+    return JSONResponse(info,status_code=200 if version>=EXPECTED_SCHEMA else 503)
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+auth = authn.current_user          # full identity; rejects device credentials
+principal = authn.principal        # any credential, used by /api/me
+agenda_auth = authn.agenda_reader  # web session, demo user or device (agenda:read)
+
 
 def own(user,owner):
     if user.id!=owner: raise HTTPException(403,'不能读取或修改其他成员的私人日程')
@@ -57,38 +95,86 @@ def own(user,owner):
 def mutation(db,user,key,tag,payload,action):
     if not key or len(key)>120: raise HTTPException(400,'写操作需要 1–120 字符的 Idempotency-Key')
     fingerprint=hashlib.sha256(json.dumps([tag,payload],sort_keys=True).encode()).hexdigest()
-    # ponytail: serialize local SQLite writes; use row locks on a server DB for scale.
-    with write_lock:
+    # Backend-neutral: BEGIN IMMEDIATE on SQLite, advisory lock on PostgreSQL.
+    # The lock is released by the commit/rollback inside the context manager.
+    with write_transaction(db,f'{user.id}:{key}'):
         owner=user.id
-        db.rollback()
-        db.connection().exec_driver_sql('BEGIN IMMEDIATE')
-        try:
-            prior=db.scalar(select(RequestRecord).where(RequestRecord.owner_id==owner,RequestRecord.key==key))
-            if prior:
-                if prior.fingerprint!=fingerprint: raise HTTPException(409,'幂等键已用于不同请求')
-                result=prior.response
-                db.rollback()
-                return result
-            result=action()
-            db.add(RequestRecord(owner_id=owner,key=key,fingerprint=fingerprint,response=result))
-            db.commit()
-            return result
-        except Exception:
+        prior=db.scalar(select(RequestRecord).where(RequestRecord.owner_id==owner,RequestRecord.key==key))
+        if prior:
+            if prior.fingerprint!=fingerprint: raise HTTPException(409,'幂等键已用于不同请求')
+            result=prior.response
             db.rollback()
-            raise
+            return result
+        result=action()
+        db.add(RequestRecord(owner_id=owner,key=key,fingerprint=fingerprint,response=result))
+        db.commit()
+        return result
 
 @app.get('/api/demo/accounts')
 def demo_accounts():
-    if not DEMO or not TOKEN_FILE.exists(): raise HTTPException(404,'演示登录未启用')
+    if not config.demo_mode() or not TOKEN_FILE.exists(): raise HTTPException(404,'演示登录未启用')
     return {'demo':True,'notice':'本地合成演示数据；切换成员等同登录该演示身份。请勿用于公开部署。','accounts':json.loads(TOKEN_FILE.read_text(encoding='utf8'))}
 
 @app.get('/api/me')
-def me(user:User=Depends(auth)):
-    return {'id':user.id,'name':user.name,'window_start':user.window_start,'window_end':user.window_end,'demo':DEMO,'ai_mode':'live' if os.getenv('AI_API_KEY') else 'demo'}
+def me(found:authn.Principal=Depends(principal)):
+    # Least privilege: a device credential may only read the agenda.
+    if found.is_device: raise HTTPException(403,'设备凭据只允许读取日程，不能调用该接口')
+    user=found.user
+    return {'id':user.id,'name':user.name,'window_start':user.window_start,'window_end':user.window_end,
+            'demo':config.demo_mode(),'ai_mode':'live' if os.getenv('AI_API_KEY') else 'demo',
+            'credential':found.kind,'scope':sorted(found.scope),'expires_at':found.expires_at}
+
+
+# ---------------------------------------------------------------------------
+# Sandbox sessions (competition web entry; replaces public demo accounts)
+# ---------------------------------------------------------------------------
+
+@app.post('/api/sandbox/sessions')
+def sandbox_login(data:SandboxLoginInput,request:Request,db:Session=Depends(session)):
+    client_ip=request.client.host if request.client else ''
+    return devices.create_session(db,data.member,client_ip)
+
+@app.get('/api/sandbox/session')
+def sandbox_session(found:authn.Principal=Depends(authn.session_only)):
+    return devices.session_info(found)
+
+@app.delete('/api/sandbox/session')
+def sandbox_logout(found:authn.Principal=Depends(authn.session_only),db:Session=Depends(session)):
+    return devices.revoke_session(db,found)
+
+
+# ---------------------------------------------------------------------------
+# Device credentials: administrators issue/revoke, owners list metadata
+# ---------------------------------------------------------------------------
+
+@app.post('/api/admin/device-tokens')
+def admin_issue_device(data:DeviceIssueInput,_:str=Depends(authn.admin),db:Session=Depends(session)):
+    return devices.issue_device(db,data.owner_id,data.label,data.ttl_days,created_by='admin',notes=data.notes)
+
+@app.get('/api/admin/device-tokens')
+def admin_list_device_tokens(owner:str|None=None,_:str=Depends(authn.admin),db:Session=Depends(session)):
+    return {'devices':devices.admin_list_devices(db,owner)}
+
+@app.delete('/api/admin/device-tokens/{token_id}')
+def admin_revoke_device(token_id:str,_:str=Depends(authn.admin),db:Session=Depends(session)):
+    return devices.revoke_device(db,token_id)
+
+@app.get('/api/devices')
+def my_devices(user:User=Depends(auth),db:Session=Depends(session)):
+    return {'devices':devices.list_devices(db,user.id),
+            'note':'last_request_at 只表示服务器最近收到该凭据的请求，不代表屏幕已亮或内容已绘制。'}
+
+
+# ---------------------------------------------------------------------------
+# Agenda: same payload and ETag for web and devices, plus device accounting
+# ---------------------------------------------------------------------------
 
 @app.get('/api/v1/agenda',response_model=AgendaResponse,responses={304:{'description':'日程内容未变化'}})
-def agenda(query:Annotated[AgendaQuery,Query()],response:Response,if_none_match:str=Header(default=''),user:User=Depends(auth),db:Session=Depends(session)):
-    body=build_agenda(db,user,query)
+def agenda(query:Annotated[AgendaQuery,Query()],response:Response,if_none_match:str=Header(default=''),found:authn.Principal=Depends(agenda_auth),db:Session=Depends(session)):
+    # Authentication (expiry/revocation) already ran; record the receipt before
+    # the 304 decision. It never touches the agenda revision or the body.
+    if found.is_device: devices.touch_device(db,found)
+    body=build_agenda(db,found.user,query)
     tag='"'+body['revision']+'"'
     etag='W/'+tag
     headers={'ETag':etag,'Cache-Control':'private, no-cache','Vary':'Authorization'}
@@ -218,22 +304,48 @@ async def read_image(image):
         else: raise HTTPException(422,'仅支持有效的 PNG / JPEG / WebP 截图')
     return raw,mime
 
+def reserve_model_call(db,found,kind):
+    """Only live model calls consume budget; the rule-based demo path is free."""
+    if not os.getenv('AI_API_KEY'): return None
+    return ai_budget.reserve(db,found.actor,kind)
+
 @app.post('/api/extract')
-async def extract_notice(text:str=Form(default='',max_length=12000),image:UploadFile|None=File(default=None),user:User=Depends(auth)):
+async def extract_notice(text:str=Form(default='',max_length=12000),image:UploadFile|None=File(default=None),found:authn.Principal=Depends(principal),db:Session=Depends(session)):
+    if found.is_device: raise HTTPException(403,'设备凭据只允许读取日程，不能调用该接口')
     raw,mime=await read_image(image)
     if not text.strip() and not raw: raise HTTPException(422,'请输入通知文本或上传截图')
+    reservation=reserve_model_call(db,found,'extract')
     try:
-        return await ai.extract(text,raw,mime)
+        result=await ai.extract(text,raw,mime)
+    except HTTPException:
+        ai_budget.settle(db,reservation,'error','http')
+        raise
     except Exception as error:
+        ai_budget.settle(db,reservation,'error',type(error).__name__)
         raise HTTPException(502,ai_config.explain(error)+' 未保存任何任务，可重试或手动录入。')
+    ai_budget.settle(db,reservation,'ok')
+    return result
 
 @app.post('/api/timetable/extract')
-async def extract_courses(image:UploadFile=File(),notes:str=Form(default='',max_length=6000),use_school_schedule:bool=Form(default=True),user:User=Depends(auth)):
+async def extract_courses(image:UploadFile=File(),notes:str=Form(default='',max_length=6000),use_school_schedule:bool=Form(default=True),found:authn.Principal=Depends(principal),db:Session=Depends(session)):
+    if found.is_device: raise HTTPException(403,'设备凭据只允许读取日程，不能调用该接口')
     raw,mime=await read_image(image)
+    reservation=reserve_model_call(db,found,'timetable')
     try:
-        return await timetable.extract_timetable(raw,mime,notes,use_school_schedule)
+        result=await timetable.extract_timetable(raw,mime,notes,use_school_schedule)
+    except HTTPException:
+        ai_budget.settle(db,reservation,'error','http')
+        raise
     except Exception as error:
+        ai_budget.settle(db,reservation,'error',type(error).__name__)
         raise HTTPException(502,ai_config.explain(error)+' 未导入任何课程，请重试或手动填写。')
+    ai_budget.settle(db,reservation,'ok')
+    return result
+
+@app.get('/api/ai/quota')
+def ai_quota(found:authn.Principal=Depends(principal),db:Session=Depends(session)):
+    if found.is_device: raise HTTPException(403,'设备凭据只允许读取日程，不能调用该接口')
+    return ai_budget.status(db,found.actor)
 
 @app.get('/api/timetable/profile')
 def school_profile(user:User=Depends(auth)):
@@ -283,16 +395,17 @@ def meeting_slots(meeting_id:int,user:User=Depends(auth),db:Session=Depends(sess
     public_meeting(db,meeting,user)
     return meeting_alternatives(db,meeting,invitations(db,meeting))
 
-def local_ai_admin(request:Request,user:User=Depends(auth)):
+def local_ai_admin(request:Request,found:authn.Principal=Depends(principal)):
     # This is a workstation configuration screen, never a production admin API.
-    if not DEMO or user.id!='A': raise HTTPException(403,'只有本地演示管理员 A 可配置模型。')
+    if not config.demo_mode() or found.is_session or found.is_device or found.user.id!='A':
+        raise HTTPException(403,'只有本地演示管理员 A 可配置模型。')
     from urllib.parse import urlsplit
     if not request.client or request.client.host not in ('127.0.0.1','::1','testclient'):
         raise HTTPException(403,'模型配置只允许本机访问。')
     origin=request.headers.get('origin')
     if origin and (urlsplit(origin).hostname not in ('127.0.0.1','localhost','::1') or origin.rstrip('/')!=str(request.base_url).rstrip('/')):
         raise HTTPException(403,'拒绝跨来源模型配置请求。')
-    return user
+    return found.user
 
 @app.get('/api/ai/settings')
 def ai_settings(user:User=Depends(local_ai_admin)):

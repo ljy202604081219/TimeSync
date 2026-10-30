@@ -79,3 +79,14 @@ class MeetingInput(RangeInput):
 class ResponseInput(Strict):
     response: Literal['accepted','declined']
     revision: int = Field(ge=1)
+
+class SandboxLoginInput(Strict):
+    """Which synthetic identity the visitor wants to explore the shared sandbox as."""
+    member: Literal['A','B','C','D']='A'
+
+class DeviceIssueInput(Strict):
+    owner_id: str = Field(min_length=1,max_length=8)
+    label: str = Field(default='',max_length=80)
+    ttl_days: int | None = Field(default=None,ge=1,le=90)
+    notes: str = Field(default='',max_length=280)
+
