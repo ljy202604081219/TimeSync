@@ -1,0 +1,101 @@
+[
+  {
+    "step": "DDL 规则提取 → 人工确认保存",
+    "mode": "demo",
+    "task_id": 13,
+    "deadline": "2026-11-05T18:00:00+08:00"
+  },
+  {
+    "step": "个人排程",
+    "version": 5,
+    "status": "optimal",
+    "task_count": 4
+  },
+  {
+    "step": "多人协调 → 全员确认 → 四人个人计划联动修复",
+    "candidate_count": 25,
+    "meeting_id": 1,
+    "states": [
+      "pending",
+      "pending",
+      "pending",
+      "confirmed"
+    ],
+    "linkage": [
+      {
+        "member_id": "A",
+        "status": "repaired",
+        "changed_count": 1,
+        "plan_id": 6,
+        "reason": "保留其他任务，仅调整冲突或受依赖影响的任务。"
+      },
+      {
+        "member_id": "B",
+        "status": "repaired",
+        "changed_count": 1,
+        "plan_id": 7,
+        "reason": "保留其他任务，仅调整冲突或受依赖影响的任务。"
+      },
+      {
+        "member_id": "C",
+        "status": "repaired",
+        "changed_count": 1,
+        "plan_id": 8,
+        "reason": "保留其他任务，仅调整冲突或受依赖影响的任务。"
+      },
+      {
+        "member_id": "D",
+        "status": "repaired",
+        "changed_count": 1,
+        "plan_id": 9,
+        "reason": "保留其他任务，仅调整冲突或受依赖影响的任务。"
+      }
+    ]
+  },
+  {
+    "step": "突发事件 → 修复预览 → 确认新版本",
+    "version": 10,
+    "status": "optimal",
+    "changes": [
+      {
+        "task_id": 1,
+        "title": "机器学习 · 实验报告",
+        "before": {
+          "task_id": 1,
+          "title": "机器学习 · 实验报告",
+          "start": "2026-11-04T15:00:00+08:00",
+          "end": "2026-11-04T17:00:00+08:00"
+        },
+        "after": {
+          "task_id": 1,
+          "title": "机器学习 · 实验报告",
+          "start": "2026-11-04T17:00:00+08:00",
+          "end": "2026-11-04T19:00:00+08:00"
+        },
+        "reason": "新增约束或依赖使原时间不可用；按最少改动目标重新安排。"
+      }
+    ]
+  },
+  {
+    "step": "前端/设备统一接口读取修复结果，已确认会议保持原时间",
+    "schema_version": 1,
+    "event_kinds": [
+      "course",
+      "deadline",
+      "disruption",
+      "meeting",
+      "task"
+    ],
+    "plan_valid": true
+  },
+  {
+    "step": "最终独立硬约束验证",
+    "members": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "passed": true
+  }
+]

@@ -1,0 +1,322 @@
+/* Keep supporting copy readable on laptop and phone displays. */
+.calendar-event{padding:3px 4px;line-height:1.2}.calendar-event b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.calendar-event small{margin-top:1px}
+.calendar-import-status {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 0 23px 18px;
+  font-size: 11px;
+  color: #72806a;
+  line-height: 1.8;
+}
+.calendar-import-status label {
+  min-width: 200px;
+  font-size: 11px;
+}
+.calendar-import-status select {
+  font-size: 11px;
+  padding: 7px;
+}
+.week-controls input[type="date"] {
+  width: 125px;
+  padding: 4px 5px;
+  border: 0;
+  font-size: 10px;
+}
+.calendar-toolbar {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@media (max-width: 760px) {
+  .calendar-import-status {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 0 18px 18px;
+    gap: 10px;
+  }
+  .calendar-import-status label {
+    min-width: 0;
+  }
+  .calendar-toolbar > div {
+    flex-wrap: wrap;
+  }
+}
+.timetable-import {
+  padding: 24px;
+}
+.timetable-image {
+  display: block;
+  max-width: 100%;
+  max-height: 300px;
+  margin: 16px auto;
+  object-fit: contain;
+  border: 1px solid #dce5d6;
+  border-radius: 6px;
+}
+.timetable-label {
+  margin: 20px 0;
+}
+.timetable-label .badge {
+  white-space: normal;
+}
+.timetable-confirm {
+  border-top: 1px solid #e5ebdf;
+  margin-top: 24px;
+  padding-top: 10px;
+}
+.course-review {
+  border: 1px solid #e3eadc;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+}
+.course-review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.course-review-head label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.course-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 12px;
+}
+.course-fields label + label {
+  margin: 0;
+}
+.course-evidence {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #71816e;
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #edf1e7;
+  overflow-wrap: anywhere;
+}
+.course-evidence p {
+  margin-top: 5px;
+  white-space: pre-wrap;
+}
+.course-ambiguity {
+  color: #ae8550;
+}
+.course-preview {
+  margin-top: 24px;
+  border-top: 1px solid #e5ebdf;
+  padding-top: 20px;
+}
+.course-preview-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #edf1e7;
+  font-size: 12px;
+}
+.course-preview-row small {
+  flex-basis: 100%;
+  color: #9b855e;
+}
+.course-preview > .btn {
+  margin-top: 18px;
+}
+.course-preview .success {
+  background: #edf5e7;
+  color: #557b46;
+}
+.page-heading:has(.calendar-actions) {
+  flex-wrap: wrap;
+}
+.calendar-actions {
+  flex-wrap: wrap;
+}
+.heading-actions.calendar-actions .btn:first-child {
+  display: inline-flex !important;
+}
+@media (max-width: 760px) {
+  .timetable-import {
+    padding: 18px;
+  }
+  .course-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+  .course-review {
+    padding: 12px;
+  }
+  .timetable-confirm .form-row {
+    align-items: center;
+  }
+  .course-preview-row {
+    font-size: 11px;
+  }
+  .timetable-image {
+    max-height: 220px;
+  }
+}
+.ai-settings {
+  padding: 25px;
+}
+.ai-provider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #29594b;
+}
+.ai-provider p {
+  font-size: 11px;
+  color: #71816e;
+  margin-top: 6px;
+}
+.ai-provider .badge {
+  margin-left: auto;
+}
+.ai-instructions {
+  font-size: 12px;
+  color: #71816e;
+  margin: 20px 0;
+  line-height: 1.9;
+}
+.ai-links {
+  display: flex;
+  gap: 20px;
+  font-size: 12px;
+  color: #567a50;
+  margin-top: 22px;
+}
+.ai-settings .success {
+  background: #eef5e9;
+  color: #517946;
+}
+.ai-settings label + label {
+  margin-top: 18px;
+}
+.error-toast {
+  background: #9d5a47;
+  z-index: 90;
+}
+.modal:focus {
+  outline: none;
+}
+.page-heading p,
+.metric-top,
+.sidebar nav button {
+  font-size: 12px;
+}
+.metric-hint,
+.section-heading p,
+.deadline-list small,
+.page-footer,
+.privacy,
+.calendar-toolbar span,
+.demo-banner,
+.legend,
+.sync-card p {
+  font-size: 10px;
+}
+.deadline-list b,
+.sync-card > button,
+.text-button,
+.card-footer-button,
+.btn,
+.schedule-list > div > div > b,
+.versions p,
+.candidate b,
+.meeting h3 {
+  font-size: 12px;
+}
+.metric-hint,
+.section-heading p,
+.deadline-list small,
+.privacy,
+.legend,
+.page-heading p,
+.page-footer,
+.calendar-toolbar span,
+.sync-card p,
+.demo-banner,
+.versions p,
+.schedule-list p,
+.candidate small {
+  color: #778674;
+}
+.calendar-event b {
+  font-size: 10px;
+}
+.calendar-event small {
+  font-size: 8px;
+}
+.day-header > div {
+  font-size: 10px;
+}
+.time-axis span {
+  font-size: 9px;
+  color: #899783;
+}
+.modal label,
+.modal legend {
+  font-size: 12px;
+}
+.modal small,
+.form-footer > span,
+.privacy-note p,
+.quiet-note {
+  font-size: 11px;
+}
+@media (max-width: 1000px) {
+  .heading-actions .btn:first-child {
+    display: inline-flex;
+  }
+  .heading-actions:has(.btn + .btn) .btn:first-child {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .page-heading p {
+    font-size: 11px;
+  }
+  .metric-hint,
+  .section-heading p,
+  .demo-banner,
+  .legend,
+  .page-footer {
+    font-size: 9px;
+  }
+  .deadline-list b,
+  .sync-card h2 {
+    font-size: 10px;
+  }
+  .deadline-list small,
+  .sync-card p,
+  .card-footer-button {
+    font-size: 9px;
+  }
+  .page-heading h1 {
+    font-size: 23px;
+  }
+  .heading-actions .btn,
+  .candidate .btn,
+  .meeting-actions .btn {
+    font-size: 10px;
+  }
+  .metric-top {
+    font-size: 11px;
+  }
+  .metric-hint {
+    line-height: 1.6;
+  }
+  .compare-columns .schedule-list > div > div > b {
+    font-size: 12px;
+  }
+  .modal label {
+    font-size: 12px;
+  }
+}

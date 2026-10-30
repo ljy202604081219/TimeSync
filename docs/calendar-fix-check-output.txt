@@ -1,0 +1,30 @@
+vite v7.1.12 building for production...
+transforming...
+✓ 1587 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.43 kB │ gzip:  0.33 kB
+dist/assets/index-BUoSYH5h.css   44.39 kB │ gzip: 10.52 kB
+dist/assets/index-Bt6NWU4I.js   266.93 kB │ gzip: 82.71 kB
+✓ built in 1.54s
+✔ calendar opens the imported week independently of the planning window (0.5291ms)
+✔ December concrete and weekly classes render outside November solver window (0.9391ms)
+✔ date navigation stays correct across month/year boundaries (0.0949ms)
+✔ overlapping imported and existing courses remain side by side (0.2642ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 114.0425
+.............................................                            [100%]
+============================== warnings summary ===============================
+..\.venv\Lib\site-packages\starlette\testclient.py:51
+  C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\.venv\Lib\site-packages\starlette\testclient.py:51: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+45 passed, 1 warning in 1.84s
+TimeSync: backend tests, TypeScript and production build passed.

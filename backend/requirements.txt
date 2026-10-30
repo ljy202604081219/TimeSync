@@ -1,0 +1,12 @@
+fastapi==0.119.1
+uvicorn[standard]==0.38.0
+SQLAlchemy==2.0.44
+ortools==9.14.6206
+pytest==8.4.2
+httpx==0.28.1
+python-multipart==0.0.20
+python-dotenv==1.1.1
+numpy==2.2.6
+pandas==2.3.3
+pydantic==2.12.3
+greenlet==3.2.4

@@ -1,0 +1,18 @@
+vite v7.1.12 building for production...
+transforming...
+✓ 1586 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.43 kB │ gzip:  0.33 kB
+dist/assets/index-BZskbO7v.css   43.60 kB │ gzip: 10.36 kB
+dist/assets/index-D2hQk5KX.js   264.51 kB │ gzip: 81.86 kB
+✓ built in 1.60s
+............................................                             [100%]
+============================== warnings summary ===============================
+..\.venv\Lib\site-packages\starlette\testclient.py:51
+  C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\.venv\Lib\site-packages\starlette\testclient.py:51: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+44 passed, 1 warning in 1.99s
+TimeSync: backend tests, TypeScript and production build passed.

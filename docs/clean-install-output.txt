@@ -1,0 +1,146 @@
+Collecting fastapi==0.119.1 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 1))
+  Downloading fastapi-0.119.1-py3-none-any.whl.metadata (28 kB)
+Collecting uvicorn==0.38.0 (from uvicorn[standard]==0.38.0->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 2))
+  Downloading uvicorn-0.38.0-py3-none-any.whl.metadata (6.8 kB)
+Collecting SQLAlchemy==2.0.44 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 3))
+  Downloading sqlalchemy-2.0.44-cp312-cp312-win_amd64.whl.metadata (9.8 kB)
+Collecting ortools==9.14.6206 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 4))
+  Downloading ortools-9.14.6206-cp312-cp312-win_amd64.whl.metadata (3.1 kB)
+Collecting pytest==8.4.2 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 5))
+  Downloading pytest-8.4.2-py3-none-any.whl.metadata (7.7 kB)
+Collecting httpx==0.28.1 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 6))
+  Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting python-multipart==0.0.20 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 7))
+  Downloading python_multipart-0.0.20-py3-none-any.whl.metadata (1.8 kB)
+Collecting python-dotenv==1.1.1 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 8))
+  Downloading python_dotenv-1.1.1-py3-none-any.whl.metadata (24 kB)
+Collecting numpy==2.2.6 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 9))
+  Downloading numpy-2.2.6-cp312-cp312-win_amd64.whl.metadata (60 kB)
+Collecting pandas==2.3.3 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 10))
+  Downloading pandas-2.3.3-cp312-cp312-win_amd64.whl.metadata (19 kB)
+Collecting pydantic==2.12.3 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 11))
+  Downloading pydantic-2.12.3-py3-none-any.whl.metadata (87 kB)
+Collecting greenlet==3.2.4 (from -r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 12))
+  Downloading greenlet-3.2.4-cp312-cp312-win_amd64.whl.metadata (4.2 kB)
+Collecting starlette<0.49.0,>=0.40.0 (from fastapi==0.119.1->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 1))
+  Downloading starlette-0.48.0-py3-none-any.whl.metadata (6.3 kB)
+Collecting typing-extensions>=4.8.0 (from fastapi==0.119.1->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 1))
+  Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting click>=7.0 (from uvicorn==0.38.0->uvicorn[standard]==0.38.0->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 2))
+  Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting h11>=0.8 (from uvicorn==0.38.0->uvicorn[standard]==0.38.0->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 2))
+  Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting absl-py>=2.0.0 (from ortools==9.14.6206->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 4))
+  Downloading absl_py-2.5.1-py3-none-any.whl.metadata (3.3 kB)
+Collecting protobuf<6.32,>=6.31.1 (from ortools==9.14.6206->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 4))
+  Downloading protobuf-6.31.1-cp310-abi3-win_amd64.whl.metadata (593 bytes)
+Collecting immutabledict>=3.0.0 (from ortools==9.14.6206->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 4))
+  Downloading immutabledict-4.3.1-py3-none-any.whl.metadata (3.5 kB)
+Collecting colorama>=0.4 (from pytest==8.4.2->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 5))
+  Downloading colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Collecting iniconfig>=1 (from pytest==8.4.2->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 5))
+  Downloading iniconfig-2.3.1-py3-none-any.whl.metadata (2.8 kB)
+Collecting packaging>=20 (from pytest==8.4.2->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 5))
+  Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pluggy<2,>=1.5 (from pytest==8.4.2->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 5))
+  Downloading pluggy-1.7.0-py3-none-any.whl.metadata (5.0 kB)
+Collecting pygments>=2.7.2 (from pytest==8.4.2->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 5))
+  Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting anyio (from httpx==0.28.1->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 6))
+  Downloading anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+Collecting certifi (from httpx==0.28.1->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 6))
+  Downloading certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+Collecting httpcore==1.* (from httpx==0.28.1->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 6))
+  Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Collecting idna (from httpx==0.28.1->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 6))
+  Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting python-dateutil>=2.8.2 (from pandas==2.3.3->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 10))
+  Downloading python_dateutil-3.0.0-py2.py3-none-any.whl.metadata (8.2 kB)
+Collecting pytz>=2020.1 (from pandas==2.3.3->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 10))
+  Downloading pytz-2026.5-py2.py3-none-any.whl.metadata (22 kB)
+Collecting tzdata>=2022.7 (from pandas==2.3.3->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 10))
+  Downloading tzdata-2026.6-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting annotated-types>=0.6.0 (from pydantic==2.12.3->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 11))
+  Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.41.4 (from pydantic==2.12.3->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 11))
+  Downloading pydantic_core-2.41.4-cp312-cp312-win_amd64.whl.metadata (7.4 kB)
+Collecting typing-inspection>=0.4.2 (from pydantic==2.12.3->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 11))
+  Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting httptools>=0.6.3 (from uvicorn[standard]==0.38.0->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 2))
+  Downloading httptools-0.9.0-cp312-cp312-win_amd64.whl.metadata (3.7 kB)
+Collecting pyyaml>=5.1 (from uvicorn[standard]==0.38.0->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 2))
+  Using cached pyyaml-6.0.3-cp312-cp312-win_amd64.whl.metadata (2.4 kB)
+Collecting watchfiles>=0.13 (from uvicorn[standard]==0.38.0->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 2))
+  Downloading watchfiles-1.3.0-cp310-abi3-win_amd64.whl.metadata (5.0 kB)
+Collecting websockets>=10.4 (from uvicorn[standard]==0.38.0->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 2))
+  Downloading websockets-17.3-cp312-cp312-win_amd64.whl.metadata (6.5 kB)
+Collecting six>=1.6 (from python-dateutil>=2.8.2->pandas==2.3.3->-r C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\backend\requirements.txt (line 10))
+  Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Downloading fastapi-0.119.1-py3-none-any.whl (108 kB)
+Downloading uvicorn-0.38.0-py3-none-any.whl (68 kB)
+Downloading sqlalchemy-2.0.44-cp312-cp312-win_amd64.whl (2.1 MB)
+   ---------------------------------------- 2.1/2.1 MB 5.0 MB/s eta 0:00:00
+Downloading ortools-9.14.6206-cp312-cp312-win_amd64.whl (20.5 MB)
+   ---------------------------------------- 20.5/20.5 MB 7.0 MB/s eta 0:00:00
+Downloading pytest-8.4.2-py3-none-any.whl (365 kB)
+Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+Downloading python_multipart-0.0.20-py3-none-any.whl (24 kB)
+Downloading python_dotenv-1.1.1-py3-none-any.whl (20 kB)
+Downloading numpy-2.2.6-cp312-cp312-win_amd64.whl (12.6 MB)
+   ---------------------------------------- 12.6/12.6 MB 8.4 MB/s eta 0:00:00
+Downloading pandas-2.3.3-cp312-cp312-win_amd64.whl (11.0 MB)
+   ---------------------------------------- 11.0/11.0 MB 5.1 MB/s eta 0:00:00
+Downloading pydantic-2.12.3-py3-none-any.whl (462 kB)
+Downloading greenlet-3.2.4-cp312-cp312-win_amd64.whl (299 kB)
+Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+Downloading pydantic_core-2.41.4-cp312-cp312-win_amd64.whl (2.0 MB)
+   ---------------------------------------- 2.0/2.0 MB 3.1 MB/s eta 0:00:00
+Downloading absl_py-2.5.1-py3-none-any.whl (137 kB)
+Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading click-8.5.0-py3-none-any.whl (125 kB)
+Downloading colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading httptools-0.9.0-cp312-cp312-win_amd64.whl (92 kB)
+Downloading immutabledict-4.3.1-py3-none-any.whl (5.0 kB)
+Downloading iniconfig-2.3.1-py3-none-any.whl (7.6 kB)
+Downloading packaging-26.3-py3-none-any.whl (129 kB)
+Downloading pluggy-1.7.0-py3-none-any.whl (27 kB)
+Downloading protobuf-6.31.1-cp310-abi3-win_amd64.whl (435 kB)
+Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+   ---------------------------------------- 1.3/1.3 MB 5.3 MB/s eta 0:00:00
+Downloading python_dateutil-3.0.0-py2.py3-none-any.whl (94 kB)
+Downloading pytz-2026.5-py2.py3-none-any.whl (506 kB)
+Using cached pyyaml-6.0.3-cp312-cp312-win_amd64.whl (154 kB)
+Downloading starlette-0.48.0-py3-none-any.whl (73 kB)
+Downloading anyio-4.15.1-py3-none-any.whl (132 kB)
+Downloading idna-3.20-py3-none-any.whl (69 kB)
+Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading tzdata-2026.6-py2.py3-none-any.whl (348 kB)
+Downloading watchfiles-1.3.0-cp310-abi3-win_amd64.whl (290 kB)
+Downloading websockets-17.3-cp312-cp312-win_amd64.whl (219 kB)
+Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Installing collected packages: pytz, websockets, tzdata, typing-extensions, six, pyyaml, python-multipart, python-dotenv, pygments, protobuf, pluggy, packaging, numpy, iniconfig, immutabledict, idna, httptools, h11, greenlet, colorama, click, certifi, annotated-types, absl-py, uvicorn, typing-inspection, SQLAlchemy, python-dateutil, pytest, pydantic-core, httpcore, anyio, watchfiles, starlette, pydantic, pandas, httpx, ortools, fastapi
+Successfully installed SQLAlchemy-2.0.44 absl-py-2.5.1 annotated-types-0.8.0 anyio-4.15.1 certifi-2026.10.23 click-8.5.0 colorama-0.4.6 fastapi-0.119.1 greenlet-3.2.4 h11-0.16.0 httpcore-1.0.9 httptools-0.9.0 httpx-0.28.1 idna-3.20 immutabledict-4.3.1 iniconfig-2.3.1 numpy-2.2.6 ortools-9.14.6206 packaging-26.3 pandas-2.3.3 pluggy-1.7.0 protobuf-6.31.1 pydantic-2.12.3 pydantic-core-2.41.4 pygments-2.21.0 pytest-8.4.2 python-dateutil-3.0.0 python-dotenv-1.1.1 python-multipart-0.0.20 pytz-2026.5 pyyaml-6.0.3 six-1.17.0 starlette-0.48.0 typing-extensions-4.16.0 typing-inspection-0.4.4 tzdata-2026.6 uvicorn-0.38.0 watchfiles-1.3.0 websockets-17.3
+
+[notice] A new release of pip is available: 24.3.1 -> 26.2.2
+[notice] To update, run: C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\.venv\Scripts\python.exe -m pip install --upgrade pip
+vite v7.1.12 building for production...
+transforming...
+✓ 1584 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.43 kB │ gzip:  0.33 kB
+dist/assets/index-BF5_acgX.css   41.42 kB │ gzip:  9.89 kB
+dist/assets/index-rhLVLj1l.js   253.08 kB │ gzip: 78.38 kB
+✓ built in 1.65s
+............................                                             [100%]
+============================== warnings summary ===============================
+..\.venv\Lib\site-packages\starlette\testclient.py:51
+  C:\Users\13588\Documents\Codex\2026-10-29\codex-timesync-ai-web-app-timesync\outputs\TimeSync\.venv\Lib\site-packages\starlette\testclient.py:51: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+28 passed, 1 warning in 1.25s
+TimeSync: backend tests, TypeScript and production build passed.
