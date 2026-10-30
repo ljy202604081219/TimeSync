@@ -6,14 +6,17 @@ from .timeutil import dt,expand,now
 from .scheduler import solve,verify
 
 def rows(db, cls, owner):
-    return list(db.scalars(select(cls).where(cls.owner_id==owner)))
+    # Stable ordering: PostgreSQL does not guarantee insertion order, and the
+    # snapshot hash / change list / agenda revision must not depend on it.
+    return list(db.scalars(select(cls).where(cls.owner_id==owner).order_by(cls.id)))
 
 def latest(db,owner):
     return db.scalar(select(PlanVersion).where(PlanVersion.owner_id==owner,PlanVersion.status.in_(['optimal','feasible'])).order_by(PlanVersion.id.desc()))
 
 def schedule_rows(db,plan):
     if not plan: return []
-    return [{'task_id':r.task_id,'title':db.get(Task,r.task_id).title,'start':r.start,'end':r.end} for r in db.scalars(select(ScheduledTask).where(ScheduledTask.plan_id==plan.id))]
+    items=db.scalars(select(ScheduledTask).where(ScheduledTask.plan_id==plan.id).order_by(ScheduledTask.start,ScheduledTask.id))
+    return [{'task_id':r.task_id,'title':db.get(Task,r.task_id).title,'start':r.start,'end':r.end} for r in items]
 
 def constraints(db,user,extra=(),ignore_meeting=None):
     available=expand([r for r in rows(db,Availability,user.id) if r.kind=='available'],user.window_start,user.window_end)

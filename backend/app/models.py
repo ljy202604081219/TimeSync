@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy import String, Integer, ForeignKey, JSON, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
@@ -107,3 +107,55 @@ class TimetableImport(Base):
     source: Mapped[str]
     created_at: Mapped[str]
     courses: Mapped[list] = mapped_column(JSON)
+
+
+# ---------------------------------------------------------------------------
+# Web sessions, device credentials and the AI budget ledger.
+# Only token hashes are stored; a raw token is shown once, at issue time.
+# ---------------------------------------------------------------------------
+
+class SandboxSession(Base):
+    """Short-lived browser session for the shared competition sandbox."""
+    __tablename__ = 'sandbox_sessions'
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    scope: Mapped[str] = mapped_column(String(160), default='sandbox')
+    created_at: Mapped[str] = mapped_column(String(40))
+    expires_at: Mapped[str] = mapped_column(String(40), index=True)
+    revoked_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    last_seen_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    client_ip: Mapped[str] = mapped_column(String(64), default='')
+
+
+class DeviceToken(Base):
+    """Read-only credential bound to one owner. Scope is fixed to agenda:read."""
+    __tablename__ = 'device_tokens'
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    label: Mapped[str] = mapped_column(String(80), default='')
+    scope: Mapped[str] = mapped_column(String(40), default='agenda:read')
+    created_at: Mapped[str] = mapped_column(String(40))
+    expires_at: Mapped[str] = mapped_column(String(40), index=True)
+    revoked_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Server receipt time only. It does not prove the screen drew anything.
+    last_request_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(160), default='')
+    notes: Mapped[str] = mapped_column(String(280), default='')
+
+
+class AiUsage(Base):
+    """One row per model call attempt; the ledger survives restarts."""
+    __tablename__ = 'ai_usage'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)
+    kind: Mapped[str] = mapped_column(String(20), default='extract')
+    actor: Mapped[str] = mapped_column(String(120), index=True)
+    status: Mapped[str] = mapped_column(String(12), default='reserved')
+    created_at: Mapped[str] = mapped_column(String(40))
+    settled_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    note: Mapped[str] = mapped_column(String(120), default='')
+
+
+Index('ix_ai_usage_day_status', AiUsage.day, AiUsage.status)
