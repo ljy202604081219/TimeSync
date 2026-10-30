@@ -8,3 +8,5 @@ dist/
 .demo-tokens.json
 __pycache__/
 .pytest_cache/
+package-lock.json
+*.tsbuildinfo
