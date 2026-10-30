@@ -1,6 +1,10 @@
 # TimeSync 时聚
 
-面向大学生的时间信息确认、个人约束排程、多人时间协调与动态计划修复 Web App。React / TypeScript / Vite / Tailwind CSS + Python / FastAPI / SQLAlchemy / SQLite + Google OR-Tools CP-SAT。
+面向大学生的时间信息确认、个人约束排程、多人时间协调与动态计划修复 Web App。React / TypeScript / Vite / Tailwind CSS + Python / FastAPI / SQLAlchemy / SQLite 或 PostgreSQL + Google OR-Tools CP-SAT。
+
+**①核心开发交接入口：[HANDOFF.md](HANDOFF.md)**。包含已完成功能、现有接口、四位成员接收边界、验收方法与已知缺口；硬件尚未购买，首阶段只读显示。
+
+**③后端与云服务交接入口：[docs/backend-03-handoff.md](docs/backend-03-handoff.md)**。数据库适配、沙箱会话、设备只读凭据、AI 限额、容器与 Render 配置；部署步骤见 [docs/deployment.md](docs/deployment.md)。
 
 最近两轮的合并更新记录见 [CHANGELOG.md](CHANGELOG.md)，包含核心接口、排程优化、湖大作息、数据清理及实际验证结果。
 
