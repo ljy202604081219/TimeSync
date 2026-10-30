@@ -1,0 +1,18 @@
+{
+  "token": "<token-returned-once>",
+  "kind": "session",
+  "scope": [
+    "agenda:read",
+    "sandbox",
+    "web:read",
+    "web:write"
+  ],
+  "user": {
+    "id": "A",
+    "name": "林同学"
+  },
+  "issued_at": "2026-10-30T21:12:20+08:00",
+  "expires_at": "2026-10-31T00:12:20+08:00",
+  "expires_in_seconds": 10800,
+  "notice": "共享演示沙箱：其他体验者可能修改同一份合成数据；请勿填写真实个人信息。"
+}

@@ -174,7 +174,7 @@ TimeSync/
 └─ docs/                     初检计划、验收报告、演示证据、截图
 ```
 
-实体：User、Task、BusyInterval、Availability、ScheduledTask、PlanVersion、Disruption、Meeting、MeetingInvitation、RequestRecord。包含用户/计划/任务/会议外键、owner 和时间索引、邀请和排程唯一约束；开启 SQLite 外键与 WAL。依赖 ID 保存为 JSON，在 API 边界检查归属、存在性与环路。
+实体：User、Task、BusyInterval、Availability、ScheduledTask、PlanVersion、Disruption、Meeting、MeetingInvitation、RequestRecord（①）；SandboxSession、DeviceToken、AiUsage 与 schema_migrations 版本表（③新增，均为增量表）。包含用户/计划/任务/会议外键、owner 和时间索引、邀请和排程唯一约束；SQLite 开启外键与 WAL，PostgreSQL 使用连接池与 advisory lock。依赖 ID 保存为 JSON，在 API 边界检查归属、存在性与环路。读取使用显式排序，避免 PostgreSQL 顺序变化影响快照与 ETag。
 
 主要 API（完整 schema 见 `/docs`）：
 
@@ -194,6 +194,17 @@ TimeSync/
 | GET /api/meetings/{id}/alternatives | 考虑当前个人计划生成会议备选 |
 | PATCH /api/meetings/{id} | 明确拒绝直接修改会议时间 |
 
+③ 新增（详见 `docs/backend-03-handoff.md` §4）：
+
+| API | 用途 |
+|---|---|
+| POST /api/sandbox/sessions | 公网演示的短时沙箱会话；替代公开的演示令牌 |
+| GET / DELETE /api/sandbox/session | 查询剩余时间 / 主动退出 |
+| POST /api/admin/device-tokens、DELETE /api/admin/device-tokens/{id} | 管理员签发、撤销绑定 owner 的只读设备凭据 |
+| GET /api/devices | 本人设备脱敏元数据（不含 token/hash） |
+| GET /api/ai/quota | 当日 AI 用量与剩余额度 |
+| GET /api/ready | 数据库连通性与 schema 版本；落后或不可用返回 503 |
+
 ## 验收与边界
 
 实际结果见 `docs/validation.md`，覆盖任务书列出的 12 类场景。所有自动测试独立于真实模型。浏览器手工完成 DDL 确认、个人排程、动态修复与四身份会议确认。初检与实施顺序见 `docs/01-inspection-plan.md`。
@@ -202,11 +213,19 @@ TimeSync/
 
 第一版限制和未实现项：
 
-- 演示身份选择会公开本地四个合成身份的令牌，这用于演示登录，不是生产认证。默认仅监听 127.0.0.1；不要把 DEMO_MODE=true 直接暴露到公网。DEMO_MODE=false 会关闭演示入口，但尚未提供注册、密码、SSO、令牌过期或生产用户管理。
+- 演示身份选择会公开本地四个合成身份的令牌，这用于演示登录，不是生产认证。默认仅监听 127.0.0.1；不要把 DEMO_MODE=true 直接暴露到公网。DEMO_MODE=false 会关闭演示入口；③ 已补短时沙箱会话与设备只读凭据作为公网入口，但注册、密码、SSO 与生产用户管理仍未实现。
 - 未接真实教务、真实日历或邮件/推送；会议邀请仅在本应用内显示。
 - 尚未用真实视觉 API Key 验证外部模型；不同兼容服务对图片/JSON 支持可能不同。规则演示只处理有限的明确格式；AI 提取仍需人工核对。
 - 任务连续安排，不拆分，不支持“已完成”历史归档。时区固定上海。周历每次显示七天，可前后翻周；跨日事件在周历中的显示有限，算法仍按完整区间处理。
 - 风险提示以未排程、约束失效和窗口内截止为依据，尚无概率风险模型。碎片目标只统计任务之间的短空档，不是完整的人类专注偏好模型。
 - 不可行诊断可指出单任务连续空档不足、DDL前总容量不足、依赖循环与依赖链赶不上截止；其余组合不可行仍给约束类别提示，尚未提取最小不可满足约束集。
-- SQLite 与进程内写锁适合本地四人演示；大规模并发、迁移、审计与监控需要后续工程化。历史版本保存时间安排及变更说明；任务编辑后旧版本列表仍使用当前任务名称。
+- SQLite 与进程内写锁适合本地四人演示；PostgreSQL 适配与版本化迁移已实现，但**尚未在真实 PostgreSQL 实例上运行**；大规模并发、审计与监控需要后续工程化。历史版本保存时间安排及变更说明；任务编辑后旧版本列表仍使用当前任务名称。
 - 响应式 CSS 已实现，浏览器在本机桌面窗口验证；尚未在真实手机与不同浏览器中全面测试。没有开展公网渗透测试或无障碍全面审计。
+
+## ③ 后端基础设施与云端（2026-10-30 接手）
+
+已完成：SQLite/PostgreSQL 双后端引擎与连接池、跨后端写事务（SQLite `BEGIN IMMEDIATE` / PostgreSQL advisory lock）、版本化迁移与云端初始化命令、短时沙箱会话、设备只读凭据（`agenda:read`，可到期可撤销）、AI 全局预算与并发预检、请求体总量限制、`/api/ready` 就绪检查、Docker/Render 部署文件、依赖安全升级。
+
+验证：`116 passed`（原 72 项 + 新增 44 项），前端 `tsc -b` 与 `vite build` 通过。详细改动、权限矩阵、未完成项见 **`docs/backend-03-handoff.md`**。
+
+**尚未验证**：Docker 镜像构建、真实 PostgreSQL 运行、Render/Neon 实际部署与持久化重启——本机无 Docker、无 PostgreSQL、无云账号授权，不能对外声称云端已跑通。部署步骤见 `docs/deployment.md`；② 登录改造见 `docs/web-auth-integration.md`；④ 设备接入见 `docs/device-integration.md`。

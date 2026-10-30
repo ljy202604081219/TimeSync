@@ -1,0 +1,14 @@
+{
+  "token": "<token-returned-once>",
+  "notice": "明文令牌只在签发响应中出现一次；此处仅示意。",
+  "id": "<device-token-id>",
+  "owner_id": "A",
+  "label": "宿舍只读屏",
+  "scope": "agenda:read",
+  "status": "active",
+  "created_at": "2026-10-30T21:12:20+08:00",
+  "expires_at": "2026-11-06T21:12:20+08:00",
+  "revoked_at": null,
+  "last_request_at": null,
+  "ttl_days": 7
+}
