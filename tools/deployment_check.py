@@ -7,10 +7,12 @@ from the environment or created internally and never printed.
     set ADMIN_TOKEN=<the platform-generated admin token>
     python tools/deployment_check.py
 """
+import http.client
 import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 RAW = os.getenv('TIMESYNC_BASE_URL', '').rstrip('/')
@@ -22,10 +24,30 @@ RANGE = 'start=2026-11-04T00:00:00%2B08:00&end=2026-11-05T00:00:00%2B08:00'
 results = []
 
 
+LOCAL = any(host in BASE for host in ('://127.0.0.1', '://localhost', '://[::1]'))
+# A local rehearsal must bypass any system HTTP proxy; otherwise POST requests to
+# 127.0.0.1 can be sent to the proxy and hang before reaching uvicorn.
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({})) if LOCAL else urllib.request.build_opener()
+
+
 def call(method, path, headers=None, body=None):
+    if LOCAL:
+        target = urllib.parse.urlsplit(BASE + path)
+        connection = http.client.HTTPConnection(target.hostname, target.port or 80, timeout=30)
+        target_path = target.path + (('?' + target.query) if target.query else '')
+        local_headers = dict(headers or {})
+        if body is not None:
+            local_headers.setdefault('Content-Length', str(len(body)))
+        local_headers.setdefault('Connection', 'close')
+        try:
+            connection.request(method, target_path, body=body, headers=local_headers)
+            response = connection.getresponse()
+            return response.status, dict(response.getheaders()), response.read()
+        finally:
+            connection.close()
     request = urllib.request.Request(BASE + path, data=body, method=method, headers=headers or {})
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with OPENER.open(request, timeout=30) as response:
             return response.status, dict(response.headers), response.read()
     except urllib.error.HTTPError as error:
         return error.code, dict(error.headers), error.read()
@@ -41,7 +63,6 @@ def check(name, ok, detail=''):
     print(f'{"PASS" if ok else "FAIL"}  {name}  {detail}')
 
 
-LOCAL = any(host in BASE for host in ('://127.0.0.1', '://localhost', '://[::1]'))
 if not (BASE.startswith('https://') or LOCAL):
     raise SystemExit('TIMESYNC_BASE_URL must be the deployed https:// address '
                      '(http://127.0.0.1:8000 is accepted for a local rehearsal)')
