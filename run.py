@@ -12,9 +12,20 @@ import webbrowser
 import time
 import urllib.request
 
+# Windows still defaults to the legacy code page (cp936/GBK on Chinese systems).
+# Every file this project ships is UTF-8, so force UTF-8 mode before any child
+# process (pip, ensurepip, uvicorn) is spawned; otherwise first-run installs can
+# fail with UnicodeDecodeError while reading requirements.txt or printing logs.
+if os.name == 'nt':
+    os.environ.setdefault('PYTHONUTF8', '1')
+    os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+
 ROOT=Path(__file__).resolve().parent
 BACKEND=ROOT/'backend'
 FRONTEND=ROOT/'frontend'
+
+# -X utf8 makes the flag explicit even when something cleared the environment.
+PYUTF8=['-X','utf8'] if os.name=='nt' else []
 
 def command(args,cwd=ROOT):
     subprocess.run([str(a) for a in args],cwd=cwd,check=True)
@@ -44,9 +55,9 @@ def main():
     requirements=BACKEND/'requirements.txt'
     stamp=python.parent.parent/'.timesync-requirements.sha256'
     digest=hashlib.sha256(requirements.read_bytes()).hexdigest()
-    if not stamp.exists() or stamp.read_text()!=digest:
-        command([python,'-m','pip','install','-r',requirements])
-        stamp.write_text(digest)
+    if not stamp.exists() or stamp.read_text(encoding='utf-8')!=digest:
+        command([python,*PYUTF8,'-m','pip','install','-r',requirements])
+        stamp.write_text(digest,encoding='utf-8')
     if not (ROOT/'.env').exists(): shutil.copy(ROOT/'.env.example',ROOT/'.env')
     pnpm=shutil.which('pnpm')
     npm=shutil.which('npm')
@@ -55,11 +66,11 @@ def main():
     if not package_command: raise SystemExit('npm or pnpm is required. A standard Node.js installation includes npm.')
     package_stamp=FRONTEND/'node_modules'/'.timesync-lock.sha256'
     package_digest=hashlib.sha256((FRONTEND/'pnpm-lock.yaml').read_bytes()).hexdigest()
-    if not package_stamp.exists() or package_stamp.read_text()!=package_digest:
+    if not package_stamp.exists() or package_stamp.read_text(encoding='utf-8')!=package_digest:
         # Platform-specific esbuild binaries are normal optional dependencies.
         # No dependency lifecycle scripts are required for this Vite project.
         command(package_command+['install','--ignore-scripts']+(['--frozen-lockfile'] if not npm or package_command!=[npm] else []),FRONTEND)
-        package_stamp.write_text(package_digest)
+        package_stamp.write_text(package_digest,encoding='utf-8')
     command([node,FRONTEND/'node_modules/typescript/bin/tsc','-b'],FRONTEND)
     command([node,FRONTEND/'node_modules/vite/bin/vite.js','build'],FRONTEND)
     if args.check:
@@ -71,7 +82,7 @@ def main():
     if args.host not in ('127.0.0.1','localhost','::1'):
         print(f'TimeSync: listening on {args.host}:{args.port}. Only use this on a trusted LAN so an ESP32 can reach '
               'the machine; never expose it to the public internet.',flush=True)
-    server=subprocess.Popen([str(p) for p in [python,'-m','uvicorn','app.main:app','--host',args.host,'--port',args.port]],cwd=BACKEND)
+    server=subprocess.Popen([str(p) for p in [python,*PYUTF8,'-m','uvicorn','app.main:app','--host',args.host,'--port',args.port]],cwd=BACKEND)
     try:
         for _ in range(150):
             if server.poll() is not None: raise SystemExit('Backend failed to start. See the error above.')

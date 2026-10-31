@@ -1,5 +1,12 @@
-# 直接依赖，版本为本次(③接手后)实际安装并跑通全部测试的组合。
-# starlette 显式锁定：fastapi 只约束 >=0.46，不锁会让干净安装漂移。
+# Direct dependencies. This exact combination is what release 03 installed and
+# verified with the full test suite (see docs/backend-03-handoff.md).
+# starlette is pinned explicitly: fastapi only constrains >=0.46, so an
+# unpinned clean install would drift.
+#
+# Keep this file ASCII-only. Several Windows toolchains still decode it with
+# the legacy code page (cp936/GBK) unless Python runs in UTF-8 mode; non-ASCII
+# comments here broke first-run installs (UnicodeDecodeError, byte 0xac).
+# start.cmd / run.py now force UTF-8 mode as well; this is defence in depth.
 fastapi==0.162.0
 starlette==0.52.1
 uvicorn[standard]==0.54.0

@@ -264,3 +264,66 @@ python -m app.bootstrap --clear-sessions   # 演示前清空所有沙箱会话
 | 体积 | 9 MB 请求体 `POST /api/extract` | **413**（解析前拒绝） |
 
 未覆盖：真实 PostgreSQL、Docker 容器、HTTPS、Render 冷启动与重新部署、Neon 额度与连接池实测、真实 MiMo 调用。
+
+---
+
+## 13. 第四轮（B4 · 联调修复，2026-10-30 深夜）
+
+针对 ① 审查意见的三项修复。安全加固按 ① 要求暂缓，本轮只动与联调直接相关的部分。
+
+### 13.1 PostgreSQL 业务并发锁（修复"全员已接受、会议仍 pending"）
+
+- **根因**：写锁按 `owner:Idempotency-Key` 取 advisory lock。两个成员确认同一会议持不同键，两个事务都能读到"对方还没答复"，各自提交后所有邀请为 accepted、会议仍是 pending。
+- **修复**：`db.write_transaction()` 改为**单一全局业务写锁**——PostgreSQL 用 `pg_advisory_xact_lock(0x54534E43)`（事务级，commit/rollback 自动释放），SQLite 仍为进程锁 + `BEGIN IMMEDIATE`。幂等键检查保持在锁内，原语义不变。
+- 新增 `DB_LOCK_TIMEOUT_MS`（默认 15000）：锁等待超限返回 `503 {"code":"busy"}` + `Retry-After`，不会无限挂起。
+- **代价（首版明确接受）**：业务写全部串行，确认会议时的 CP-SAT 计算会阻塞其他写请求数秒。四人演示规模无碍；扩容方向是按 meeting 行锁 / `SELECT FOR UPDATE`，已记入未完成项。
+
+真实 PostgreSQL 并发测试（`tests/test_pg_concurrency.py`，7 项，需 `TIMESYNC_TEST_DATABASE_URL` 指向真实 PG）：
+
+| 测试 | 证明 |
+|---|---|
+| 全局锁常量唯一 | 所有写者争同一把锁 |
+| 不同键的两个写者不重叠 | 计数器读-改-写无丢失更新，事务区间不相交 |
+| **旧按键加锁必然复现缺陷**（特征化测试） | 同样三个请求，换回旧锁策略 → 全部 200、全部 accepted、会议仍 pending |
+| 三人同时接受 → 恰好确认一次 | 数据库终态 confirmed、linkage 3 条、邀请全部 accepted |
+| decline 与 accept 并发 | 会议终态 declined，绝不会被并发接受翻转成 confirmed |
+| 同幂等键并发两次 | 只建 1 条任务、1 条 RequestRecord，无 500 |
+| 确认中抛错 → 完整回滚 | 邀请状态/会议状态/RequestRecord/PlanVersion 全部无残留，锁释放后同键重试成功 |
+
+测试环境：本机从 `pgserver` wheel 中解出的 **PostgreSQL 16.2**（127.0.0.1:55432，非 Docker）。全套 135 项测试在该实例上通过（见 13.4）。注：`test_writers_with_different_keys_never_overlap` 在加固诊断信息前出现过一次偶发失败（约 1/20），加 5ms 提交边界容差后连续 15+ 次全绿；如再遇到请附窗口数据。
+
+### 13.2 沙箱登录闭环（配合 ②）
+
+- 新增 `GET /api/auth/config`（公开）：UI 据此决定登录方式，不再猜测。云端返回 `sandbox_mode=true` + 4 个成员（仅 id/name）+ TTL + login/logout 路径；本地返回 demo 模式。
+- 所有 401/403/429/413/503 带稳定 `code`（`session_expired`、`session_revoked`、`auth_invalid`、`device_forbidden`、`sandbox_full`、`payload_too_large`、`busy` 等），401 附 `WWW-Authenticate: Bearer`。`detail` 中文文案原样保留，旧前端不受影响。
+- **前端参考实现**：新增 `frontend/src/auth.ts`，`App.tsx` 接入——登录页按 config 渲染沙箱成员按钮（→ `POST /api/sandbox/sessions`），401 自动清凭据回登录页，侧边栏"退出登录"调 `DELETE /api/sandbox/session`，并显示"会话剩余 N 分钟"（30 秒刷新）。localStorage 键 `timesync-auth`，与旧键 `timesync-token` 双写兼容。
+- 契约文档：`docs/contracts/auth-flow.md`（错误码表 + 浏览器验收清单）。`tsc -b` + `vite build` 通过。
+- 本机 HTTP 全流程实测（云端形态）：config → 登录 → me/state/meetings 全 200 → 退出 → 原令牌立即 401 `session_revoked` → 首页静态资源 200。
+
+### 13.3 Windows 首次安装 GBK 编码修复
+
+- **复现**：cp936 代码页 + 关闭 UTF-8 模式时，`open('backend/requirements.txt')` 直接 `UnicodeDecodeError: 'gbk' codec can't decode byte 0xac`（探针脚本 `tools/encoding_probe.py` 留档）。pip 26 自身已免疫，但任何走系统区域编码的组件（旧版 pip、ensurepip、日志打印）都会踩中。
+- **修复（三层）**：
+  1. `requirements.txt` 改为纯 ASCII，中文说明移到本文件——彻底消除该类问题；
+  2. `run.py` 在 Windows 上强制 `PYTHONUTF8=1` + `PYTHONIOENCODING=utf-8`，pip/uvicorn 子进程一律加 `-X utf8`；
+  3. `start.cmd` 开头 `chcp 65001` + 设置同样环境变量 + `python -X utf8 run.py %*`（支持参数透传，如 `start.cmd --check`）；`start.ps1` 同步处理；python 不存在时提示安装并回退 `py -3`。
+- 干净环境验证：新建空 venv（不删旧环境），在 cp936 代码页下执行 `start.cmd --python .venv-clean\Scripts\python.exe --check`，走真实首次安装→构建→测试全链路（结果见 13.4）。
+
+### 13.4 本轮验证记录
+
+- SQLite 全套：135 项（128 passed + 7 项 PG 专属跳过）。
+- 真实 PostgreSQL 16.2 全套：135 项全部通过（116 旧 + 19 新），迁移在 PG 上自动建到 schema_version=2。
+- 干净安装：`start.cmd --check` 在 cp936 下从零装依赖、构建前端、跑双端测试（输出见交付包 `docs/backend-03-test-output.txt`）。
+- 30 秒轮询额度实测（设备凭据，7 次 × 30 秒）：见下表。
+- PostgreSQL 重启持久化（`tools/persistence_probe.py`）：写会话+设备凭据+任务 → **杀进程重启** → 会话 200、设备 200、任务仍在。
+- 全程未在文档/输出中记录任何明文凭据。
+
+### 13.5 本轮后仍未完成（需要账号/网络，代码侧已就绪）
+
+| 事项 | 状态 | 需要什么 |
+|---|---|---|
+| 部署后 HTTPS 地址 | 未完成（本机无 Render/Neon 账号） | 按 deployment.md 创建服务；或提供 Render API Key 由 ③ 代部署 |
+| 真实测试设备令牌 | 未签发（无公网服务可绑） | 部署完成后 `POST /api/admin/device-tokens`，令牌私下交付 |
+| 部署环境 200/304/401/403 复测 | 未执行 | 拿到 HTTPS 地址后运行 `tools/deployment_check.py` |
+| Docker 镜像构建 / Render 持久化 | 未执行（本机无 Docker） | 任何一台有 Docker 的机器跑 `docker compose up` |
+| 大规模并发下的锁吞吐 | 首版接受串行 | 数据量或人数增长后改行锁 |
