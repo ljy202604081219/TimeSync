@@ -4,7 +4,7 @@ dist/
 *.db
 *.db-*
 .env
-.env.deploy
+.env.deploy*
 .ai-settings-*
 .demo-tokens.json
 __pycache__/
