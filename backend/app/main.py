@@ -14,7 +14,8 @@ from . import auth as authn
 from . import config
 from . import devices
 from . import migrations
-from .db import engine, session, SessionLocal, backend_of, describe, schema_version, write_transaction
+from .db import (engine, session, SessionLocal, backend_of, describe, schema_version, write_transaction,
+                 BusinessLockTimeout)
 from .middleware import BodySizeLimit
 from .models import User,Task,BusyInterval,Availability,PlanVersion,Disruption,RequestRecord
 from .schemas import TaskInput,BusyInput,AvailabilityInput,RangeInput,DisruptionInput
@@ -26,6 +27,7 @@ from .models import Meeting,MeetingInvitation
 from .coordination import find_candidates,create_meeting,respond,public_meeting,invitations,meeting_alternatives
 from . import ai
 from . import ai_config
+from . import errors
 from . import timetable
 from .models import TimetableImport
 from .intervals import overlap
@@ -55,6 +57,15 @@ async def lifespan(app):
 
 app = FastAPI(title='TimeSync 时聚', lifespan=lifespan)
 app.add_middleware(BodySizeLimit)
+# Stable {"detail", "code"} envelopes plus WWW-Authenticate on 401.
+errors.install(app)
+
+
+@app.exception_handler(BusinessLockTimeout)
+def business_lock_timeout(request:Request,exc:BusinessLockTimeout):
+    # Retryable: the request never reached the business action, nothing changed.
+    return JSONResponse({'detail':'另一项修改正在进行，请一两秒后重试。','code':'busy'},
+                        status_code=503,headers={'Retry-After':'2'})
 
 
 @app.get('/api/health')
@@ -95,8 +106,10 @@ def own(user,owner):
 def mutation(db,user,key,tag,payload,action):
     if not key or len(key)>120: raise HTTPException(400,'写操作需要 1–120 字符的 Idempotency-Key')
     fingerprint=hashlib.sha256(json.dumps([tag,payload],sort_keys=True).encode()).hexdigest()
-    # Backend-neutral: BEGIN IMMEDIATE on SQLite, advisory lock on PostgreSQL.
-    # The lock is released by the commit/rollback inside the context manager.
+    # One global business write lock (see db.write_transaction): the invariant
+    # "every invitation accepted => meeting confirmed" spans several owners, so
+    # a per-owner/per-key lock let two members race and leave the meeting pending.
+    # The idempotency check below still runs inside the lock, unchanged.
     with write_transaction(db,f'{user.id}:{key}'):
         owner=user.id
         prior=db.scalar(select(RequestRecord).where(RequestRecord.owner_id==owner,RequestRecord.key==key))
@@ -110,6 +123,28 @@ def mutation(db,user,key,tag,payload,action):
         db.commit()
         return result
 
+@app.get('/api/auth/config')
+def auth_config(db:Session=Depends(session)):
+    """Public: which login flow this deployment offers.
+
+    The UI must never guess. Cloud deployments run with DEMO_MODE=false (no
+    permanent tokens) and SANDBOX_MODE=true (short-lived sessions); the local
+    launcher runs the opposite. Contract: docs/contracts/auth-flow.md.
+    """
+    sandbox=config.sandbox_enabled()
+    return {
+        'demo_mode':config.demo_mode(),
+        'sandbox_mode':sandbox,
+        'legacy_token_auth':config.legacy_token_auth(),
+        'members':devices.members(db) if sandbox or config.demo_mode() else [],
+        'session_ttl_minutes':config.session_ttl_minutes() if sandbox else None,
+        'login_path':'/api/sandbox/sessions' if sandbox else None,
+        'logout_path':'/api/sandbox/session' if sandbox else None,
+        'credential_header':'Authorization: Bearer <token>',
+        'notice':devices.SANDBOX_NOTICE if sandbox else '',
+    }
+
+
 @app.get('/api/demo/accounts')
 def demo_accounts():
     if not config.demo_mode() or not TOKEN_FILE.exists(): raise HTTPException(404,'演示登录未启用')
@@ -118,7 +153,7 @@ def demo_accounts():
 @app.get('/api/me')
 def me(found:authn.Principal=Depends(principal)):
     # Least privilege: a device credential may only read the agenda.
-    if found.is_device: raise HTTPException(403,'设备凭据只允许读取日程，不能调用该接口')
+    if found.is_device: raise errors.forbidden('设备凭据只允许读取日程，不能调用该接口','device_forbidden')
     user=found.user
     return {'id':user.id,'name':user.name,'window_start':user.window_start,'window_end':user.window_end,
             'demo':config.demo_mode(),'ai_mode':'live' if os.getenv('AI_API_KEY') else 'demo',
@@ -311,7 +346,7 @@ def reserve_model_call(db,found,kind):
 
 @app.post('/api/extract')
 async def extract_notice(text:str=Form(default='',max_length=12000),image:UploadFile|None=File(default=None),found:authn.Principal=Depends(principal),db:Session=Depends(session)):
-    if found.is_device: raise HTTPException(403,'设备凭据只允许读取日程，不能调用该接口')
+    if found.is_device: raise errors.forbidden('设备凭据只允许读取日程，不能调用该接口','device_forbidden')
     raw,mime=await read_image(image)
     if not text.strip() and not raw: raise HTTPException(422,'请输入通知文本或上传截图')
     reservation=reserve_model_call(db,found,'extract')
@@ -328,7 +363,7 @@ async def extract_notice(text:str=Form(default='',max_length=12000),image:Upload
 
 @app.post('/api/timetable/extract')
 async def extract_courses(image:UploadFile=File(),notes:str=Form(default='',max_length=6000),use_school_schedule:bool=Form(default=True),found:authn.Principal=Depends(principal),db:Session=Depends(session)):
-    if found.is_device: raise HTTPException(403,'设备凭据只允许读取日程，不能调用该接口')
+    if found.is_device: raise errors.forbidden('设备凭据只允许读取日程，不能调用该接口','device_forbidden')
     raw,mime=await read_image(image)
     reservation=reserve_model_call(db,found,'timetable')
     try:
@@ -344,7 +379,7 @@ async def extract_courses(image:UploadFile=File(),notes:str=Form(default='',max_
 
 @app.get('/api/ai/quota')
 def ai_quota(found:authn.Principal=Depends(principal),db:Session=Depends(session)):
-    if found.is_device: raise HTTPException(403,'设备凭据只允许读取日程，不能调用该接口')
+    if found.is_device: raise errors.forbidden('设备凭据只允许读取日程，不能调用该接口','device_forbidden')
     return ai_budget.status(db,found.actor)
 
 @app.get('/api/timetable/profile')

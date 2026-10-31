@@ -2068,6 +2068,21 @@ main {
   align-items: center;
   margin-top: 27px;
 }
+.sandbox-notice {
+  font-size: 10px;
+  color: #8b9a79;
+  line-height: 1.6;
+  margin: -10px 0 18px;
+}
+.member-id {
+  display: block;
+  font-weight: 400;
+  color: #9cae87;
+}
+.session-low {
+  font-style: normal;
+  color: #c07a3d;
+}
 .login-members {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

@@ -42,6 +42,18 @@ import Team from "./Team";
 import AISettings from "./AISettings";
 import TimetableImport from "./TimetableImport";
 import { TaskForm, ExtractPanel, RepairPanel, Settings } from "./Forms";
+import {
+  ApiFailure,
+  type AuthConfig,
+  type AuthSession,
+  fetchAuthConfig,
+  fetchDemoAccounts,
+  loadAuth,
+  remainingMinutes,
+  sandboxLogin,
+  sandboxLogout,
+  saveAuth,
+} from "./auth";
 const pages = [
   { id: "home", name: "概览", icon: LayoutDashboard },
   { id: "tasks", name: "DDL 管理", icon: ListTodo },
@@ -66,7 +78,11 @@ const titles: Record<string, [string, string]> = {
 };
 export default function App() {
   const [page, setPage] = useState("home"),
-    [token, setToken] = useState(localStorage.getItem("timesync-token") || ""),
+    // One session object instead of a bare token: the kind decides whether
+    // logout must call the server, and expires_at drives the countdown.
+    [auth, setAuth] = useState<AuthSession | null>(() => loadAuth()),
+    [authConfig, setAuthConfig] = useState<AuthConfig | null>(null),
+    [signingIn, setSigningIn] = useState(false),
     [accounts, setAccounts] = useState<Record<string, string>>({}),
     [me, setMe] = useState<Data | null>(null),
     [state, setState] = useState<Data | null>(null),
@@ -83,7 +99,9 @@ export default function App() {
     [timetableOpen, setTimetableOpen] = useState(false),
     [planResult, setPlanResult] = useState<Data | null>(null),
     [repairResult, setRepairResult] = useState<Data | null>(null),
-    [version, setVersion] = useState<Data | null>(null);
+    [version, setVersion] = useState<Data | null>(null),
+    [sessionLeft, setSessionLeft] = useState<number | null>(null);
+  const token = auth?.token ?? "";
   const currentToken = useRef(token);
   currentToken.current = token;
   async function api(
@@ -95,7 +113,7 @@ export default function App() {
     const response = await fetch("/api" + path, {
       method,
       headers: {
-        Authorization: "Bearer " + token,
+        ...(token ? { Authorization: "Bearer " + token } : {}),
         ...(method !== "GET" ? { "Idempotency-Key": crypto.randomUUID() } : {}),
         ...(!form && body !== undefined
           ? { "Content-Type": "application/json" }
@@ -108,13 +126,23 @@ export default function App() {
             ? (body as FormData)
             : JSON.stringify(body),
     });
-    const data = await response.json();
-    if (!response.ok)
-      throw new Error(
-        typeof data.detail === "string"
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {
+      // non-JSON error page: build a readable message below
+    }
+    if (!response.ok) {
+      const detail =
+        typeof data?.detail === "string"
           ? data.detail
-          : JSON.stringify(data.detail),
-      );
+          : JSON.stringify(data?.detail ?? response.status);
+      // 401 means the credential is gone (expired/revoked/server restarted
+      // with a fresh database): drop it so the login screen comes back
+      // instead of looping on a dead token.
+      if (response.status === 401 && token) endSession(false);
+      throw new ApiFailure(detail, response.status, data?.code);
+    }
     return data;
   }
   async function refresh() {
@@ -144,23 +172,64 @@ export default function App() {
     setToast(message);
     window.setTimeout(() => setToast(""), 5000);
   }
+  function applyAuth(session: AuthSession | null, message = "") {
+    saveAuth(session);
+    currentToken.current = session?.token ?? "";
+    setAuth(session);
+    setError(message);
+    setMe(null);
+    setState(null);
+  }
+  /** Local sign-out. `remote` true also tells the server to revoke the session. */
+  async function endSession(remote = true) {
+    const current = auth;
+    if (remote && current?.kind === "session" && current.token)
+      await sandboxLogout(current.token);
+    applyAuth(null);
+  }
+  async function signInWithSandbox(member: string) {
+    setSigningIn(true);
+    try {
+      applyAuth(await sandboxLogin(member));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "登录失败，请重试");
+    } finally {
+      setSigningIn(false);
+    }
+  }
   function login(value: string) {
-    localStorage.setItem("timesync-token", value);
-    setError("");
-    setToken(value);
+    // Manual token entry and the local demo-account buttons land here.
+    if (!value) {
+      endSession();
+      return;
+    }
+    applyAuth({ token: value, kind: "manual", user: null, expires_at: null });
   }
   function navigate(id: string) {
     setPage(id);
     setMobile(false);
   }
   useEffect(() => {
-    fetch("/api/demo/accounts")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.accounts) setAccounts(d.accounts);
-      })
-      .catch(() => setError("后端未连接，请检查启动终端。"));
+    // Which login flow is offered is decided by the server, never by the UI.
+    fetchAuthConfig().then((config) => {
+      setAuthConfig(config);
+      if (!config) setError("后端未连接，请检查启动终端。");
+      else if (config.demo_mode)
+        fetchDemoAccounts()
+          .then(setAccounts)
+          .catch(() => setError("后端未连接，请检查启动终端。"));
+    });
   }, []);
+  useEffect(() => {
+    // Sandbox sessions expire: refresh the remaining-minutes label regularly.
+    if (auth?.kind !== "session") return;
+    const timer = window.setInterval(
+      () => setSessionLeft(remainingMinutes(auth.expires_at)),
+      30000,
+    );
+    setSessionLeft(remainingMinutes(auth.expires_at));
+    return () => window.clearInterval(timer);
+  }, [auth]);
   useEffect(() => {
     if (!token) {
       setMe(null);
@@ -218,19 +287,46 @@ export default function App() {
             <>
               <div className="demo-note">
                 <ShieldCheck size={17} />
-                四人合成数据 · 本地演示 · 2026.11.02–11.08
+                {authConfig?.sandbox_mode
+                  ? `共享演示沙箱 · 会话有效期 ${authConfig.session_ttl_minutes ?? 180} 分钟`
+                  : "四人合成数据 · 本地演示 · 2026.11.02–11.08"}
               </div>
               <div className="login-members">
-                {Object.entries(accounts).map(([m, t]) => (
-                  <button key={m} onClick={() => login(t)}>
-                    <span className={"avatar " + m}>{m}</span>
-                    <b>成员 {m}</b>
-                    <small>
-                      进入演示 <ArrowUpRight size={13} />
-                    </small>
-                  </button>
-                ))}
+                {authConfig?.sandbox_mode
+                  ? (authConfig.members ?? []).map((m) => (
+                      <button
+                        key={m.id}
+                        disabled={signingIn}
+                        onClick={() => signInWithSandbox(m.id)}
+                      >
+                        <span className={"avatar " + m.id}>{m.id}</span>
+                        <b>
+                          {m.name}
+                          <small className="member-id">成员 {m.id}</small>
+                        </b>
+                        <small>
+                          {signingIn ? (
+                            <LoaderCircle className="spin" size={13} />
+                          ) : (
+                            "进入沙箱 "
+                          )}
+                          {!signingIn && <ArrowUpRight size={13} />}
+                        </small>
+                      </button>
+                    ))
+                  : Object.entries(accounts).map(([m, t]) => (
+                      <button key={m} onClick={() => login(t)}>
+                        <span className={"avatar " + m}>{m}</span>
+                        <b>成员 {m}</b>
+                        <small>
+                          进入演示 <ArrowUpRight size={13} />
+                        </small>
+                      </button>
+                    ))}
               </div>
+              {authConfig?.sandbox_mode && authConfig.notice && (
+                <p className="sandbox-notice">{authConfig.notice}</p>
+              )}
               <details>
                 <summary>使用独立访问令牌</summary>
                 <form
@@ -367,14 +463,23 @@ export default function App() {
           <span className={"avatar " + u.id}>{u.id}</span>
           <div>
             <b>{u.name}</b>
-            <small>演示成员 {u.id} · 私人空间</small>
+            <small>
+              演示成员 {u.id} · 私人空间
+              {sessionLeft !== null && (
+                <em className={sessionLeft <= 10 ? "session-low" : undefined}>
+                  {sessionLeft <= 0
+                    ? "会话已到期，正在退出…"
+                    : ` · 会话剩余 ${sessionLeft} 分钟`}
+                </em>
+              )}
+            </small>
           </div>
           <button
             title="退出登录"
             aria-label="退出登录"
             disabled={working}
             className="icon-button"
-            onClick={() => login("")}
+            onClick={() => endSession()}
           >
             <LogOut size={16} />
           </button>

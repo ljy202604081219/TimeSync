@@ -9,7 +9,7 @@ from datetime import timedelta
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 
-from . import config
+from . import config, errors
 from .auth import DEVICE_SCOPES, hash_token, new_token, remaining_minutes, ttl_stamp
 from .models import DeviceToken, SandboxSession, User
 from .timeutil import dt, now
@@ -51,10 +51,10 @@ def device_metadata(token):
 
 def create_session(db, user_id, client_ip=''):
     if not config.sandbox_enabled():
-        raise HTTPException(404, '沙箱登录未启用')
+        raise errors.ApiError(404, '沙箱登录未启用', 'sandbox_disabled')
     user = db.get(User, user_id)
     if not user:
-        raise HTTPException(404, '演示身份不存在')
+        raise errors.ApiError(404, '演示身份不存在', 'unknown_member')
     # Cheap housekeeping: expired sessions are useless and would otherwise
     # accumulate across redeploys of a free instance.
     db.execute(delete(SandboxSession).where(SandboxSession.expires_at < _before(days=1)))
@@ -63,7 +63,8 @@ def create_session(db, user_id, client_ip=''):
         SandboxSession.expires_at > now(),
     )) or 0
     if active_count >= config.max_active_sessions():
-        raise HTTPException(429, '当前沙箱会话过多，请稍后再试或联系管理员清理')
+        raise errors.ApiError(429, '当前沙箱会话过多，请稍后再试或联系管理员清理', 'sandbox_full',
+                              {'Retry-After': '30'})
 
     raw = new_token()
     minutes = config.session_ttl_minutes()
@@ -88,6 +89,12 @@ def create_session(db, user_id, client_ip=''):
         'expires_in_seconds': minutes * 60,
         'notice': SANDBOX_NOTICE,
     }
+
+
+def members(db):
+    """Login choices for /api/auth/config. Never includes a token or a hash."""
+    rows = db.scalars(select(User).order_by(User.id))
+    return [{'id': user.id, 'name': user.name} for user in rows]
 
 
 def session_info(found):

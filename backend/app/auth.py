@@ -22,6 +22,8 @@ from fastapi import Depends, Header, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import errors
+
 from . import config
 from .db import session
 from .models import DeviceToken, SandboxSession, User
@@ -88,23 +90,23 @@ def resolve(db, raw):
     sandbox = db.scalar(select(SandboxSession).where(SandboxSession.token_hash == digest))
     if sandbox:
         if sandbox.revoked_at:
-            raise HTTPException(401, '沙箱会话已退出或被撤销，请重新进入演示沙箱')
+            raise errors.unauthorized('沙箱会话已退出或被撤销，请重新进入演示沙箱', 'session_revoked')
         if expired(sandbox.expires_at):
-            raise HTTPException(401, '沙箱会话已过期，请重新进入演示沙箱')
+            raise errors.unauthorized('沙箱会话已过期，请重新进入演示沙箱', 'session_expired')
         user = db.get(User, sandbox.user_id)
         if not user:
-            raise HTTPException(401, '沙箱会话对应的身份不存在，请联系管理员')
+            raise errors.unauthorized('沙箱会话对应的身份不存在，请联系管理员', 'session_expired')
         return Principal(user=user, kind='session', scope=SESSION_SCOPES, token_id=sandbox.id, expires_at=sandbox.expires_at)
 
     device = db.scalar(select(DeviceToken).where(DeviceToken.token_hash == digest))
     if device:
         if device.revoked_at:
-            raise HTTPException(401, '设备凭据已撤销，请联系管理员重新签发')
+            raise errors.unauthorized('设备凭据已撤销，请联系管理员重新签发', 'device_revoked')
         if expired(device.expires_at):
-            raise HTTPException(401, '设备凭据已过期，请联系管理员重新签发')
+            raise errors.unauthorized('设备凭据已过期，请联系管理员重新签发', 'device_expired')
         user = db.get(User, device.owner_id)
         if not user:
-            raise HTTPException(401, '设备凭据绑定的身份不存在')
+            raise errors.unauthorized('设备凭据绑定的身份不存在', 'device_revoked')
         return Principal(user=user, kind='device', scope=DEVICE_SCOPES, token_id=device.id, expires_at=device.expires_at)
 
     return None
@@ -112,36 +114,36 @@ def resolve(db, raw):
 
 def bearer(authorization: str = Header(default='')) -> str:
     if not authorization.startswith('Bearer '):
-        raise HTTPException(401, '请先登录或提供访问令牌')
+        raise errors.unauthorized('请先登录或提供访问令牌', 'auth_missing')
     raw = authorization[7:].strip()
     if not raw:
-        raise HTTPException(401, '访问令牌为空')
+        raise errors.unauthorized('访问令牌为空', 'auth_missing')
     return raw
 
 
 def principal(token: str = Depends(bearer), db: Session = Depends(session)) -> Principal:
     found = resolve(db, token)
     if not found:
-        raise HTTPException(401, '访问令牌无效')
+        raise errors.unauthorized('访问令牌无效或已被删除，请重新登录', 'auth_invalid')
     return found
 
 
 def current_user(found: Principal = Depends(principal)) -> User:
     """Full identity: rejects device credentials on every business endpoint."""
     if found.is_device:
-        raise HTTPException(403, '设备凭据只允许读取日程，不能调用该接口')
+        raise errors.forbidden('设备凭据只允许读取日程，不能调用该接口', 'device_forbidden')
     return found.user
 
 
 def agenda_reader(found: Principal = Depends(principal)) -> Principal:
     if 'agenda:read' not in found.scope:
-        raise HTTPException(403, '该凭据没有日程读取权限')
+        raise errors.forbidden('该凭据没有日程读取权限', 'device_forbidden')
     return found
 
 
 def session_only(found: Principal = Depends(principal)) -> Principal:
     if found.kind != 'session':
-        raise HTTPException(403, '该接口只接受沙箱会话凭据')
+        raise errors.ApiError(403, '该接口只接受沙箱会话凭据（当前为本地演示身份令牌）', 'not_a_session')
     return found
 
 
@@ -149,12 +151,12 @@ def admin(x_admin_token: str = Header(default=''), authorization: str = Header(d
     """Administrator gate for credential issuance. Disabled when unset."""
     expected = config.admin_token()
     if len(expected) < 16:
-        raise HTTPException(503, '服务端未配置 ADMIN_TOKEN（至少 16 字符），管理接口不可用')
+        raise errors.ApiError(503, '服务端未配置 ADMIN_TOKEN（至少 16 字符），管理接口不可用', 'admin_disabled')
     supplied = x_admin_token.strip()
     if not supplied and authorization.startswith('Bearer '):
         supplied = authorization[7:].strip()
     if not supplied or not hmac.compare_digest(supplied, expected):
-        raise HTTPException(403, '管理员凭据无效')
+        raise errors.forbidden('管理员凭据无效', 'admin_denied')
     return 'admin'
 
 
