@@ -336,8 +336,41 @@ python -m app.bootstrap --clear-sessions   # 演示前清空所有沙箱会话
 
 | 事项 | 状态 | 需要什么 |
 |---|---|---|
-| 部署后 HTTPS 地址 | 未完成（本机无 Render/Neon 账号） | 按 deployment.md 创建服务；或提供 Render API Key 由 ③ 代部署 |
+| 部署后 HTTPS 地址 | 未完成（本机无 Render/Neon 账号） | 按 `docs/deploy-render-neon.md` 第 1–4 步执行（30–40 分钟）；或提供 Render API Key 由 ③ 代部署 |
 | 真实测试设备令牌 | 未签发（无公网服务可绑） | 部署完成后 `POST /api/admin/device-tokens`，令牌私下交付 |
-| 部署环境 200/304/401/403 复测 | 未执行 | 拿到 HTTPS 地址后运行 `tools/deployment_check.py` |
+| 部署环境 200/304/401/403 复测 | 未执行（本机预演 12/12 已过，见 §14.3） | 拿到 HTTPS 地址后运行 `tools/deployment_check.py` |
 | Docker 镜像构建 / Render 持久化 | 未执行（本机无 Docker） | 任何一台有 Docker 的机器跑 `docker compose up` |
 | 大规模并发下的锁吞吐 | 首版接受串行 | 数据量或人数增长后改行锁 |
+
+---
+
+## 14. 部署就绪补强（B5 · 2026-10-31）
+
+没有账号也能把"部署时必定踩的坑"提前修掉。本轮只动这些，其余不变。
+
+### 14.1 空库首次启动初始化（否则部署完没人能登录）
+
+- **问题**：云端 `DEMO_MODE=false` + 空库 → `/api/auth/config` 返回 0 个成员，登录页空白，无法进入。免费档没有 Shell，`python -m app.bootstrap` 没地方执行。
+- **修复**：新增 `BOOTSTRAP_FIXTURES`（默认 false）。开启后，应用启动时**仅当用户表为空**才创建 A/B/C/D 四个合成身份 + 当周演示数据；库非空时直接跳过。`BOOTSTRAP_ANCHOR` 可固定演示周（如 `2026-11-02`）。`render.yaml` 已设为 true。
+- 幂等性实测：空库启动 → users/tasks/plan_versions = 4/12/4；杀进程重启 → 仍是 4/12/4，日志不再打印初始化信息。
+- 新增 4 项测试（`tests/test_bootstrap_first_boot.py`）：空库建身份+夹具、二次启动零写入、只建身份不加夹具、开关默认关闭。
+
+### 14.2 Neon 连接池与预处理语句
+
+- **问题**：Neon/Supabase 的 `-pooler` 主机是 PgBouncer 事务模式，psycopg 的预处理语句缓存会跨连接残留，第二次执行同一查询可能报 `prepared statement "s_1" already exists`。这是部署后才暴露、且很难自诊断的错误。
+- **修复**：`db.postgres_connect_args()` 检测 URL 主机名含 `pooler` 时自动设 `prepare_threshold=None`（关闭缓存）；直连不受影响。新增测试断言两种主机的连接参数差异。
+- 文档改成"优先 Direct 直连（本项目自带 5 条连接池），Pooled 也可用"。
+
+### 14.3 复测脚本可用于本机预演
+
+- `tools/deployment_check.py` 原本硬编码 `https://`，本机跑不了；现已支持 `http://127.0.0.1` 预演（会打印"未覆盖 TLS/DNS/冷启动"）。同时修掉两个自身 bug：`http→https` 强转、HTTP 头大小写敏感取 ETag。
+- **本机预演结果：`12/12 checks passed`**（空库 + 云端形态，SQLite）。涵盖 health、ready(schema v2)、auth/config、旧入口 404、登录、agenda 200+ETag、304、设备同 ETag、设备写 403、未知令牌 401、撤销后 401、退出后 401。
+
+### 14.4 新增《照做版》部署手册
+
+`docs/deploy-render-neon.md`：GitHub 私有仓库 → Neon(Singapore) → Render Blueprint → `deployment_check.py` → 签发设备令牌 → 保活与费用 → 故障对照表 → 回滚。内含免费档现实约束：15 分钟休眠 / 冷启动 40–60 秒 / 750 实例小时 / Render 自带 PG 30 天删除（故用 Neon）。
+
+### 14.5 本轮测试与状态
+
+- SQLite：**133 passed + 7 skipped（共 140 项）**。
+- 仍未完成（需账号）：HTTPS 地址、真实设备令牌、部署环境复测、Docker 构建、云端重启持久化。**代码侧已无已知阻塞**，按 `docs/deploy-render-neon.md` 第 1–4 步执行即可。

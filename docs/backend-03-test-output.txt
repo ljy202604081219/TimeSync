@@ -1,24 +1,9 @@
-# B4 联调修复轮 · 测试原始输出（2026-10-31）
+# B4/B5 测试原始输出（2026-10-31）
 
-## 1) SQLite 全套（128 passed + 7 项 PG 专属跳过 = 135 项）
-
+## 1) SQLite 全套
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-128 passed, 7 skipped, 1 warning in 13.81s
+133 passed, 7 skipped, 1 warning in 24.64s
 
-## 2) 真实 PostgreSQL 16.2 全套（135 passed）
-
+## 2) 真实 PostgreSQL 16.2 全套
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-135 passed, 1 warning in 135.97s (0:02:15)
-
-## 3) PG 并发专属测试（7 项）
-tests/test_pg_concurrency.py::test_decline_wins_over_a_concurrent_accept PASSED [ 71%]
-tests/test_pg_concurrency.py::test_same_idempotency_key_in_parallel_creates_one_row PASSED [ 85%]
-tests/test_pg_concurrency.py::test_failed_confirm_rolls_back_and_releases_the_lock PASSED [100%]
-
-============================== warnings summary ===============================
-..\.venv\Lib\site-packages\starlette\testclient.py:45
-  C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\.venv\Lib\site-packages\starlette\testclient.py:45: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
-    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 7 passed, 1 warning in 16.04s ========================
+140 passed, 1 warning in 232.00s (0:03:51)

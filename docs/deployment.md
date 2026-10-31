@@ -1,7 +1,10 @@
 # 部署与运维手册（Render + Neon）
 
 适用版本：③ 接手后的后端（`docs/backend-03-handoff.md`）。
-**本文所有步骤在本机均未执行**：没有 Docker、没有 PostgreSQL、没有 Render/Neon 账号授权。执行者请边做边把结果填到文末"部署记录"，未填的部分不能对外声称已完成。
+**本文的云端步骤在本机未执行**：没有 Docker、没有 Render/Neon 账号授权。执行者请边做边把结果填到文末"部署记录"，未填的部分不能对外声称已完成。
+（本机已完成的等价验证：真实 PostgreSQL 16.2 跑通全套测试、重启持久化；空库 + 云端形态的首次启动初始化与 `tools/deployment_check.py` 12/12 见 `docs/backend-03-handoff.md` §14。）
+
+> **第一次部署请直接看 [deploy-render-neon.md](deploy-render-neon.md)**：一份"点哪里、填什么、看到什么算成功"的照做版。本文是完整手册，含巡检、备份、回滚。
 
 ---
 
@@ -21,7 +24,9 @@ ESP32 只读屏 ─ HTTPS ─┘        ├─ Neon PostgreSQL：业务、会话
 ## 2. 一次性准备
 
 1. Neon 建项目，选与 Render 相近的地域（Render `singapore` → Neon `ap-southeast-1`）。
-2. 复制 **pooler** 连接串（主机名含 `-pooler`），确认带 `sslmode=require`。
+2. 复制连接串，确认带 `sslmode=require`。两种都能用：
+   - **Direct**（主机名不含 `-pooler`）：本项目自带连接池（`DB_POOL_SIZE=5`），推荐；
+   - **Pooled**（含 `-pooler`）：代码检测到后会自动把 psycopg 的 `prepare_threshold` 设为 `None`，避免 PgBouncer 事务模式下的预处理语句冲突。
 3. Render 新建 Blueprint 或 Web Service，指向本仓库 `Dockerfile`。
 4. 在 Render 环境变量里填：
    - `DATABASE_URL`：上一步的连接串（Secret）
@@ -34,6 +39,10 @@ ESP32 只读屏 ─ HTTPS ─┘        ├─ Neon PostgreSQL：业务、会话
 
 ## 3. 首次上线顺序
 
+免费档没有 Shell，所以**初始化做在启动流程里**：`render.yaml` 已设 `BOOTSTRAP_FIXTURES=true`，容器首次启动时若用户表为空，会自动建 A/B/C/D 四个合成身份和当周演示数据；库非空时什么也不做（重启、重新部署、第二个 worker 都不会重复写入或覆盖数据）。要固定演示周，设 `BOOTSTRAP_ANCHOR=2026-11-02`。
+
+有 Shell（付费实例或本机）时也可以手动执行同样的事：
+
 ```bash
 # 1) 应用 schema（容器启动会自动执行，也可手动确认）
 python -m app.migrate --status
@@ -45,6 +54,9 @@ python -m app.bootstrap --fixtures
 # 3) 健康与就绪
 curl -s https://<service>.onrender.com/api/health   # {"status":"ok",...}
 curl -s https://<service>.onrender.com/api/ready    # status ok, schema_version=2
+
+# 4) 一键复测（12 项，含 200/304/401/403 与设备限权）
+TIMESYNC_BASE_URL=https://<service>.onrender.com ADMIN_TOKEN=<…> python tools/deployment_check.py
 ```
 
 `/api/ready` 返回 503 时：`status=behind` → 跑迁移；`database=unavailable` → 查 Neon 连接串/额度/白名单；两者都不回显 DSN。
