@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy import create_mock_engine, inspect, select, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from app import db as dbmod
@@ -68,25 +69,56 @@ def test_write_transaction_uses_begin_immediate_on_sqlite(tmp_path):
         engine.dispose()
 
 
-def test_write_transaction_uses_advisory_lock_on_postgres():
-    calls = []
+class _FakeSession:
+    """Records the statements write_transaction issues on PostgreSQL."""
 
-    class FakeSession:
-        def get_bind(self):
-            return SimpleNamespace(url=make_url('postgresql+psycopg://u:p@h/db'))
+    def __init__(self, error=None):
+        self.calls = []
+        self.error = error
 
-        def rollback(self):
-            calls.append(('rollback', None))
+    def get_bind(self):
+        return SimpleNamespace(url=make_url('postgresql+psycopg://u:p@h/db'))
 
-        def execute(self, statement, params):
-            calls.append((str(statement), params))
+    def rollback(self):
+        self.calls.append(('rollback', None))
 
-    with write_transaction(FakeSession(), 'A:key') as active:
-        assert isinstance(active, FakeSession)
-    assert calls[0] == ('rollback', None)
-    sql, params = calls[1]
-    assert 'pg_advisory_xact_lock' in sql and params == {'scope': 'A:key'}
-    assert not any('BEGIN IMMEDIATE' in (sql or '') for sql, _ in calls)
+    def execute(self, statement, params=None):
+        self.calls.append((str(statement), params))
+        if self.error and 'pg_advisory_xact_lock' in str(statement):
+            raise self.error
+        return None
+
+
+def test_write_transaction_takes_the_same_global_lock_for_every_scope():
+    """Regression: per-key locks could not protect a cross-owner invariant."""
+    keys = []
+    for scope in ('A:6f1c', 'B:9ab2', 'C:x'):
+        fake = _FakeSession()
+        with write_transaction(fake, scope) as active:
+            assert active is fake
+        sql = [call for call in fake.calls]
+        assert sql[0] == ('rollback', None)
+        assert 'SET LOCAL lock_timeout' in sql[1][0]
+        statement, params = sql[2]
+        assert 'pg_advisory_xact_lock(:key)' in statement
+        keys.append(params['key'])
+        assert not any('BEGIN IMMEDIATE' in (text or '') for text, _ in fake.calls)
+    assert keys == [dbmod.BUSINESS_LOCK_KEY] * 3, keys
+    assert len(set(keys)) == 1
+
+
+def test_lock_timeout_is_reported_as_a_retryable_business_lock_error():
+    timeout = OperationalError('SELECT pg_advisory_xact_lock($1)', {}, Exception('canceling statement due to lock timeout'))
+    with pytest.raises(dbmod.BusinessLockTimeout):
+        with write_transaction(_FakeSession(error=timeout), 'A:key'):
+            pass
+
+
+def test_other_postgres_errors_are_not_mistaken_for_lock_timeouts():
+    broken = OperationalError('SELECT pg_advisory_xact_lock($1)', {}, Exception('connection reset by peer'))
+    with pytest.raises(OperationalError):
+        with write_transaction(_FakeSession(error=broken), 'A:key'):
+            pass
 
 
 def test_write_transaction_rolls_back_on_error(tmp_path):

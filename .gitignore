@@ -10,3 +10,6 @@ __pycache__/
 .pytest_cache/
 package-lock.json
 *.tsbuildinfo
+.venv-clean/
+.venv-gbk/
+.pytest-tmp/

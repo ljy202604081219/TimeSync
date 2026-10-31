@@ -3,8 +3,17 @@
 SQLite stays the zero-configuration local path; PostgreSQL (Neon/Render) is the
 cloud path. Nothing here may assume one backend's locking or transaction rules:
 SQLite keeps ``BEGIN IMMEDIATE`` plus the in-process write lock, PostgreSQL uses
-a transaction-scoped advisory lock so two workers cannot double-insert the same
-idempotency key.
+one transaction-scoped advisory lock for *all* business writes.
+
+Why one global key instead of a per-user key: business invariants are not
+owner-scoped. Two members confirming the same meeting take two different
+idempotency keys, so a per-key lock let both transactions read "the other
+member is still pending" and commit, leaving every invitation accepted while
+the meeting itself stayed ``pending``. The first release therefore serialises
+all business mutations behind ``pg_advisory_xact_lock(BUSINESS_LOCK_KEY)``.
+The cost is that CP-SAT planning inside a mutation blocks other writers for the
+duration of that transaction; with four demo users this is acceptable and it is
+documented in docs/backend-03-handoff.md as the scaling limit.
 
 Environment (all optional, see .env.example):
   DATABASE_URL        sqlite:///./timesync.db | postgresql+psycopg://user:pass@host/db
@@ -14,6 +23,8 @@ Environment (all optional, see .env.example):
   DB_POOL_TIMEOUT     seconds to wait for a pool slot, default 30
   DB_POOL_RECYCLE     recycle pooled connections after N seconds, default 1800
   DB_CONNECT_TIMEOUT  connect timeout in seconds, default 10
+  DB_LOCK_TIMEOUT_MS  how long a writer waits for the business write lock
+                      before giving up with a retryable 503, default 15000
 """
 import os
 from contextlib import contextmanager
@@ -22,6 +33,7 @@ from threading import RLock
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, event, inspect, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 load_dotenv(Path(__file__).resolve().parents[2] / '.env')
@@ -30,6 +42,14 @@ DEFAULT_SQLITE_URL = 'sqlite:///./timesync.db'
 # Serializes local SQLite writers. On PostgreSQL the database itself serializes;
 # this lock is kept because the first release runs a single uvicorn worker.
 WRITE_LOCK = RLock()
+# int64 constant ("TSNC"). One lock for the whole business-write domain, see the
+# module docstring. Changing this value is a breaking change for rolling
+# deployments: old and new workers would stop excluding each other.
+BUSINESS_LOCK_KEY = 0x54534E43
+
+
+class BusinessLockTimeout(RuntimeError):
+    """The business write lock could not be taken in time. Retryable (503)."""
 
 
 class Base(DeclarativeBase):
@@ -103,17 +123,44 @@ def session():
         yield db
 
 
-@contextmanager
-def write_transaction(db, scope):
-    """Open a serialized write transaction for one logical mutation.
+def lock_timeout_ms():
+    return env_int('DB_LOCK_TIMEOUT_MS', 15000, 500)
 
-    ``scope`` identifies the writer (owner + idempotency key). SQLite takes the
-    process lock and ``BEGIN IMMEDIATE``; PostgreSQL takes an advisory lock that
-    is released when the surrounding transaction commits or rolls back, so two
-    concurrent workers cannot both think a key is unused.
+
+def _acquire_postgres_business_lock(db):
+    """Take the one transaction-scoped business lock, bounded by a timeout.
+
+    ``pg_advisory_xact_lock`` is released by the commit or rollback that ends the
+    surrounding transaction, so a crash cannot leak it. ``lock_timeout`` keeps a
+    stuck writer from blocking the whole API for the rest of the request.
+    """
+    timeout = lock_timeout_ms()
+    # SET LOCAL does not accept bind parameters; ``timeout`` is an int from
+    # env_int(), so formatting it cannot inject SQL.
+    db.execute(text(f'SET LOCAL lock_timeout = {int(timeout)}'))
+    try:
+        db.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': BUSINESS_LOCK_KEY})
+    except OperationalError as error:
+        # 55P03 lock_not_available, raised by lock_timeout.
+        if 'lock_not_available' in str(error) or '55P03' in str(error) or 'lock timeout' in str(error).lower():
+            raise BusinessLockTimeout('另一项修改正在进行，请稍后重试') from error
+        raise
+
+
+@contextmanager
+def write_transaction(db, scope='business'):
+    """Open the serialized business write transaction for one logical mutation.
+
+    ``scope`` is only used for logging and for the SQLite trace: the lock itself
+    is global, because business invariants (all invitations accepted => meeting
+    confirmed) span several owners and therefore several idempotency keys.
+
+    SQLite takes the process lock plus ``BEGIN IMMEDIATE``. PostgreSQL takes a
+    transaction-scoped advisory lock before the first read, so a writer always
+    observes every mutation that committed before it entered.
     """
     backend = backend_of(db.get_bind().url)
-    db.rollback()
+    db.rollback()  # end any implicit read transaction; it may hold a stale snapshot
     if backend == 'sqlite':
         with WRITE_LOCK:
             db.connection().exec_driver_sql('BEGIN IMMEDIATE')
@@ -124,8 +171,7 @@ def write_transaction(db, scope):
                 raise
         return
     if backend == 'postgresql':
-        # Transaction-scoped: released by the commit/rollback below.
-        db.execute(text('SELECT pg_advisory_xact_lock(hashtext(:scope))'), {'scope': scope})
+        _acquire_postgres_business_lock(db)
     try:
         yield db
     except BaseException:

@@ -68,7 +68,8 @@ class BodySizeLimit:
 
     async def _reject(self, send):
         limit_mb = self.max_bytes / (1024 * 1024)
-        body = json.dumps({'detail': f'请求体超过 {limit_mb:.1f} MB 上限，请压缩截图或改用手动录入。'}, ensure_ascii=False).encode()
+        body = json.dumps({'detail': f'请求体超过 {limit_mb:.1f} MB 上限，请压缩截图或改用手动录入。',
+                           'code': 'payload_too_large'}, ensure_ascii=False).encode()
         await send({
             'type': 'http.response.start',
             'status': 413,
