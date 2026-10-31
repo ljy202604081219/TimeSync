@@ -1,7 +1,7 @@
 """Issue a real device token against the deployed TimeSync service.
 
 Usage:
-    python tools/issue_device_token.py [--label ljy-main-device]
+    python tools/issue_device_token.py [--owner A] [--label ljy-main-device]
 
 Requires in .env.deploy:
     TIMESYNC_BASE_URL=https://<service>.onrender.com
@@ -48,6 +48,9 @@ def main() -> int:
     label = 'ljy-main-device'
     if '--label' in sys.argv:
         label = sys.argv[sys.argv.index('--label') + 1]
+    owner = 'A'
+    if '--owner' in sys.argv:
+        owner = sys.argv[sys.argv.index('--owner') + 1].strip().upper()
 
     values = load_env()
     base = values.get('TIMESYNC_BASE_URL', '')
@@ -68,7 +71,7 @@ def main() -> int:
             'Content-Type': 'application/json',
             'Accept': 'application/json',
         },
-        {'label': label},
+        {'owner_id': owner, 'label': label},
     )
     if status != 200:
         print('issue_failed_status=' + str(status))
@@ -84,6 +87,7 @@ def main() -> int:
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUT_FILE.write_text(
         'base_url=' + base.rstrip('/') + '\n'
+        'owner_id=' + owner + '\n'
         'label=' + str(body.get('label', label)) + '\n'
         'device_id=' + str(body.get('id', '')) + '\n'
         'expires_at=' + str(body.get('expires_at', '')) + '\n'
@@ -98,6 +102,7 @@ def main() -> int:
     masked = token[:6] + '...' + token[-4:] if len(token) > 12 else '***'
     print('device_token_issued=true')
     print('device_id=' + str(body.get('id', '')))
+    print('owner_id=' + owner)
     print('label=' + str(body.get('label', label)))
     print('expires_at=' + str(body.get('expires_at', '')))
     print('token_preview=' + masked)

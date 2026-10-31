@@ -172,3 +172,30 @@ curl -X POST https://timesync-xxxx.onrender.com/api/admin/device-tokens \
 3. `tools/deployment_check.py` 的 12/12 输出（可直接粘贴）
 
 设备令牌不进文档，只私下交付。
+
+---
+
+## 10. 首次真实部署记录（2026-10-31）
+
+| 项目 | 值 |
+| --- | --- |
+| 服务地址 | `https://timesync-9fe1.onrender.com` |
+| Render 服务 | `srv-dbj0vnu7bikc73e411a0`（timesync，free，singapore，docker） |
+| 部署提交 | `23b840c`（`main`） |
+| 数据库 | Neon，PostgreSQL 18.6，schema v2 |
+| 创建方式 | 控制台 Blueprint（`render.yaml`） |
+| 首次构建 | 15:57:22Z 开始 → 15:58:52Z live，约 90 秒 |
+
+**实测结论**
+
+- `tools/deployment_check.py` 对公网地址：**12/12 通过**（健康、就绪、沙箱登录、ETag/304、设备只读、越权 403、未知令牌 401、退出即失效）。
+- 设备凭据签发成功（owner=A），读日程 200 且 `revision` 与网页端一致；写 `/api/tasks` 返回 `403 device_forbidden`。
+- 云端重启（`server_restarted` 15:06:43Z）后再次读取：`revision` 完全不变，`/api/ready` 显示 `postgresql+psycopg`、`expected_schema_version=2`，证明数据全部来自 Neon，容器本地文件无依赖。
+- `AI_API_KEY` 未配置：截图/课表提取类接口按设计返回 503，其余功能正常。
+
+**踩过的坑（写下来避免重复）**
+
+1. **Render API 创建服务返回 402**：即使 `plan=free`，新账号通过 API 创建也要先绑定付款方式；控制台 Blueprint 才是免卡路径。
+2. **免费实例 15 分钟休眠**：休眠后首个请求需 30–60 秒冷启动，脚本类验收要先把 `/api/health` 唤醒再跑，否则读超时。
+3. **`ADMIN_TOKEN` 可由 API 读回**：`GET /v1/services/{id}/env-vars` 能取到值（长度 44），因此无需人工复制；但不要把它写进任何文档或聊天记录。
+4. **签发设备凭据必须带 `owner_id`**：只传 `label` 会 422；`tools/issue_device_token.py --owner A` 已封装。

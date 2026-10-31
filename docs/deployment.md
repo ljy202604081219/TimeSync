@@ -1,8 +1,8 @@
 # 部署与运维手册（Render + Neon）
 
 适用版本：③ 接手后的后端（`docs/backend-03-handoff.md`）。
-**本文的云端步骤在本机未执行**：没有 Docker、没有 Render/Neon 账号授权。执行者请边做边把结果填到文末"部署记录"，未填的部分不能对外声称已完成。
-（本机已完成的等价验证：真实 PostgreSQL 16.2 跑通全套测试、重启持久化；空库 + 云端形态的首次启动初始化与 `tools/deployment_check.py` 12/12 见 `docs/backend-03-handoff.md` §14。）
+**云端已实际部署（2026-10-31）**：Render 服务与 Neon 数据库均已上线，公网地址 `https://timesync-9fe1.onrender.com`，`tools/deployment_check.py` 12/12 通过，重启后数据完整；结果见文末"部署记录"。
+（本机另已完成真实 PostgreSQL 16.2 全套测试、并发与重启持久化；空库 + 云端形态的首次启动初始化与 12/12 见 `docs/backend-03-handoff.md` §14。）
 
 > **第一次部署请直接看 [deploy-render-neon.md](deploy-render-neon.md)**：一份"点哪里、填什么、看到什么算成功"的照做版。本文是完整手册，含巡检、备份、回滚。
 
@@ -139,14 +139,14 @@ python -m app.migrate --status      # DATABASE_URL 指向隔离库
 
 | 项目 | 结果 | 时间 | 执行人 |
 |---|---|---|---|
-| Neon 项目与地域 | | | |
-| Render 服务与子域名 | | | |
-| `/api/health` | | | |
-| `/api/ready`（schema_version） | | | |
-| `python -m app.bootstrap --fixtures` | | | |
-| 重启/重新部署后数据仍在 | | | |
-| 冷启动耗时 | | | |
-| 备份文件位置 | | | |
-| 恢复演练结果 | | | |
+| Neon 项目与地域 | 已建，Singapore，PostgreSQL 18.6，库 `neondb` | 2026-10-31 | ③ + 用户 |
+| Render 服务与子域名 | `timesync` / `https://timesync-9fe1.onrender.com`（free，singapore，docker） | 2026-10-31 23:58 +08 | ③ + 用户 |
+| `/api/health` | 200 `{"status":"ok","timezone":"Asia/Shanghai","slot_minutes":15}` | 2026-11-01 00:05 +08 | ③ |
+| `/api/ready`（schema_version） | 200，`expected_schema_version=2`，`postgresql+psycopg` | 2026-11-01 00:07 +08 | ③ |
+| `python -m app.bootstrap --fixtures` | 空库首次初始化：4 位成员、12 条任务；二次启动不重复写入 | 2026-10-31 23:4x +08 | ③ |
+| 重启/重新部署后数据仍在 | 是；`server_restarted` 后 `revision` 不变（`958f70e0…ff889`） | 2026-11-01 00:06 +08 | ③ |
+| 冷启动耗时 | 休眠后首请求 >45 秒（脚本读超时）；唤醒后 1.5–2.9 秒 | 2026-11-01 00:04 +08 | ③ |
+| 备份文件位置 | `.pytest-tmp/neon-backup-20261101-0007.json`（15 表 / 113 行 / 18.1 KB，本地，未入库） | 2026-11-01 00:07 +08 | ③ |
+| 恢复演练结果 | 未演练：Neon 免费版无自动备份，只有历史窗口；恢复需按备份 JSON 回灌 | — | — |
 | 设备凭据签发与撤销 | | | |
 | AI 额度实测 | | | |
