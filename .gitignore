@@ -13,3 +13,4 @@ package-lock.json
 .venv-clean/
 .venv-gbk/
 .pytest-tmp/
+.venv-verify/
