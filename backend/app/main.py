@@ -28,6 +28,7 @@ from .coordination import find_candidates,create_meeting,respond,public_meeting,
 from . import ai
 from . import ai_config
 from . import errors
+from . import bootstrap
 from . import timetable
 from .models import TimetableImport
 from .intervals import overlap
@@ -43,6 +44,14 @@ async def lifespan(app):
     # Versioned, additive migrations only. Never drop_all() or reset data.
     if config.auto_migrate():
         migrations.ensure_schema(engine)
+    if config.bootstrap_fixtures():
+        # Cloud first boot: an empty database would answer /api/auth/config with
+        # zero members and nobody could log in. Idempotent - only acts when the
+        # user table is empty, so restarts and redeploys change nothing.
+        summary = bootstrap.initialise_if_empty(anchor=config.bootstrap_anchor() or None)
+        if summary['created_identities']:
+            print(f"TimeSync: bootstrapped {len(summary['created_identities'])} synthetic identities "
+                  f"and fixtures for {len(summary['fixtures_members'])} members.")
     if config.demo_mode():
         with SessionLocal() as db:
             tokens=seed(db)

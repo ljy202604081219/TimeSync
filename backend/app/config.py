@@ -50,6 +50,21 @@ def auto_migrate():
     return flag('AUTO_MIGRATE', True)
 
 
+def bootstrap_fixtures():
+    """Seed the synthetic identities (and demo week) when the database is empty.
+
+    Cloud containers have no shell on the free tier, so an empty database left
+    after the first migration would have zero members and nobody could log in.
+    Off by default: a local run seeds through DEMO_MODE instead.
+    """
+    return flag('BOOTSTRAP_FIXTURES', False)
+
+
+def bootstrap_anchor():
+    """Monday of the demo week for BOOTSTRAP_FIXTURES; empty means this week."""
+    return text('BOOTSTRAP_ANCHOR')
+
+
 def admin_token():
     return text('ADMIN_TOKEN')
 

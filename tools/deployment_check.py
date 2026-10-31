@@ -13,8 +13,10 @@ import sys
 import urllib.error
 import urllib.request
 
-BASE = os.getenv('TIMESYNC_BASE_URL', '').rstrip('/').replace('http://', 'https://') \
-    if os.getenv('TIMESYNC_BASE_URL', '').startswith('http://') else os.getenv('TIMESYNC_BASE_URL', '').rstrip('/')
+RAW = os.getenv('TIMESYNC_BASE_URL', '').rstrip('/')
+# A deployed address must be reached over TLS; a loopback rehearsal is plain http.
+BASE = RAW if any(host in RAW for host in ('://127.0.0.1', '://localhost', '://[::1]')) \
+    else RAW.replace('http://', 'https://')
 ADMIN = os.getenv('ADMIN_TOKEN', '')
 RANGE = 'start=2026-11-04T00:00:00%2B08:00&end=2026-11-05T00:00:00%2B08:00'
 results = []
@@ -29,13 +31,22 @@ def call(method, path, headers=None, body=None):
         return error.code, dict(error.headers), error.read()
 
 
+def header(headers, name):
+    """HTTP/1.1 header names are case-insensitive; uvicorn sends them lowercase."""
+    return next((value for key, value in headers.items() if key.lower() == name.lower()), '')
+
+
 def check(name, ok, detail=''):
     results.append((name, ok, detail))
     print(f'{"PASS" if ok else "FAIL"}  {name}  {detail}')
 
 
-if not BASE.startswith('https://'):
-    raise SystemExit('TIMESYNC_BASE_URL must be the deployed https:// address')
+LOCAL = any(host in BASE for host in ('://127.0.0.1', '://localhost', '://[::1]'))
+if not (BASE.startswith('https://') or LOCAL):
+    raise SystemExit('TIMESYNC_BASE_URL must be the deployed https:// address '
+                     '(http://127.0.0.1:8000 is accepted for a local rehearsal)')
+if LOCAL:
+    print('NOTE: local rehearsal; TLS, DNS and cold-start behaviour are not exercised.')
 print('checking', BASE)
 
 code, _, _ = call('GET', '/api/health')
@@ -53,7 +64,7 @@ session = json.loads(raw).get('token', '') if code == 200 else ''
 check('sandbox login 200', code == 200 and len(session) >= 40, str(code))
 web_auth = {'Authorization': 'Bearer ' + session}
 code, headers, raw = call('GET', f'/api/v1/agenda?{RANGE}', web_auth)
-etag = headers.get('ETag', '')
+etag = header(headers, 'ETag')
 check('web agenda 200 + ETag', code == 200 and etag.startswith('W/'), f'{code} {etag[:18]}...')
 code, _, _ = call('GET', f'/api/v1/agenda?{RANGE}', {**web_auth, 'If-None-Match': etag})
 check('304 on If-None-Match', code == 304, str(code))
@@ -64,7 +75,7 @@ code, _, raw = call('POST', '/api/admin/device-tokens',
 device = json.loads(raw) if code == 200 else {}
 device_auth = {'Authorization': 'Bearer ' + device.get('token', '')}
 code, d_headers, d_raw = call('GET', f'/api/v1/agenda?{RANGE}', device_auth)
-check('device agenda 200, same ETag', code == 200 and d_headers.get('ETag') == etag, str(code))
+check('device agenda 200, same ETag', code == 200 and header(d_headers, 'ETag') == etag, str(code))
 code, _, _ = call('POST', '/api/tasks',
                   {**device_auth, 'Idempotency-Key': 'deploy-check-write', 'Content-Type': 'application/json'},
                   json.dumps({'title': '部署自检', 'deadline': '2026-11-06T18:00:00+08:00',

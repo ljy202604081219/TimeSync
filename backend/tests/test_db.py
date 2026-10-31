@@ -44,6 +44,17 @@ def test_postgres_pool_settings_are_applied(monkeypatch):
         engine.dispose()
 
 
+def test_pooler_host_disables_prepared_statements():
+    """Neon/Supabase "-pooler" hosts run PgBouncer in transaction mode."""
+    from app.db import postgres_connect_args
+    pooled = postgres_connect_args(
+        'postgresql+psycopg://u:p@ep-cool-1234-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require')
+    direct = postgres_connect_args('postgresql+psycopg://u:p@ep-cool-1234.ap-southeast-1.aws.neon.tech/neondb')
+    assert pooled['prepare_threshold'] is None
+    assert 'prepare_threshold' not in direct
+    assert pooled['application_name'] == 'timesync'
+
+
 def test_sqlite_pragmas_and_foreign_keys(tmp_path):
     engine = make_engine('sqlite:///' + str(tmp_path / 'pragma.db'))
     try:

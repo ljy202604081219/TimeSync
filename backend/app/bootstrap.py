@@ -45,6 +45,30 @@ def counts(db):
     }
 
 
+def ensure_identities(db):
+    """Create A/B/C/D when the user table is empty. Returns the created ids."""
+    if db.scalar(select(func.count()).select_from(User)):
+        return []
+    seed(db, demo_data=False, tokens=False)
+    return [f'{member}:{MEMBERS[member]}' for member in 'ABCD']
+
+
+def initialise_if_empty(anchor=None, with_fixtures=True):
+    """First-boot initialisation for a fresh cloud database.
+
+    Idempotent by construction: it only acts when there are no users at all, so
+    a restart, a redeploy or a second worker cannot duplicate or reset data.
+    Called from the app lifespan when BOOTSTRAP_FIXTURES is on.
+    """
+    created, added = [], []
+    with SessionLocal() as db:
+        created = ensure_identities(db)
+        if created and with_fixtures:
+            added = fixtures(db, anchor=anchor or current_monday(), reset_window=True)
+        snapshot = counts(db)
+    return {'created_identities': created, 'fixtures_members': added, 'counts': snapshot}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--fixtures', action='store_true', help='Add synthetic course/task/plan fixtures for the demo week')
@@ -59,9 +83,7 @@ def main(argv=None):
     cleared = 0
     with SessionLocal() as db:
         if not args.status:
-            if db.scalar(select(func.count()).select_from(User)) == 0:
-                seed(db, demo_data=False, tokens=False)
-                created_identities = [f'{member}:{MEMBERS[member]}' for member in 'ABCD']
+            created_identities = ensure_identities(db)
             if args.clear_sessions:
                 cleared = db.execute(delete(SandboxSession)).rowcount or 0
                 db.commit()

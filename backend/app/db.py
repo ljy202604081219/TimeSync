@@ -33,6 +33,7 @@ from threading import RLock
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, event, inspect, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -85,6 +86,23 @@ def backend_of(url):
     return 'other'
 
 
+def postgres_connect_args(url):
+    """Per-connection psycopg options for a PostgreSQL URL.
+
+    Neon/Supabase hand out a ``-pooler`` host (PgBouncer in transaction mode).
+    There a prepared statement can outlive the server connection that created it,
+    so psycopg's statement cache must be off, otherwise the second use of the
+    same query fails with "prepared statement already exists".
+    """
+    args = {
+        'connect_timeout': env_int('DB_CONNECT_TIMEOUT', 10, 1),
+        'application_name': 'timesync',
+    }
+    if 'pooler' in (make_url(url).host or '').lower():
+        args['prepare_threshold'] = None
+    return args
+
+
 def make_engine(url, **overrides):
     url = normalize_url(url)
     backend = backend_of(url)
@@ -92,10 +110,7 @@ def make_engine(url, **overrides):
     if backend == 'sqlite':
         kwargs.setdefault('connect_args', {'check_same_thread': False, 'timeout': 30})
     elif backend == 'postgresql':
-        connect_args = {
-            'connect_timeout': env_int('DB_CONNECT_TIMEOUT', 10, 1),
-            'application_name': 'timesync',
-        }
+        connect_args = postgres_connect_args(url)
         connect_args.update(kwargs.pop('connect_args', {}))
         kwargs.setdefault('connect_args', connect_args)
         # Managed PostgreSQL drops idle connections; pre-ping turns that into a

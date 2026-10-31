@@ -63,6 +63,9 @@ services:
         value: "8388608"
       - key: AUTO_MIGRATE
         value: "true"
+      # 空库首次启动时创建 A/B/C/D 合成身份与当周演示数据（非空库不写入）
+      - key: BOOTSTRAP_FIXTURES
+        value: "true"
       - key: WEB_CONCURRENCY
         value: "1"
       - key: TZ
