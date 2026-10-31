@@ -18,4 +18,6 @@ if errorlevel 1 (
 ) else (
   python -X utf8 run.py %*
 )
-pause
+rem Keep the window open only when something went wrong, so a double-click shows
+rem the error and non-interactive runs (CI, start.cmd --check) never block.
+if errorlevel 1 pause

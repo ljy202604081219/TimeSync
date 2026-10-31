@@ -306,16 +306,30 @@ python -m app.bootstrap --clear-sessions   # 演示前清空所有沙箱会话
 - **修复（三层）**：
   1. `requirements.txt` 改为纯 ASCII，中文说明移到本文件——彻底消除该类问题；
   2. `run.py` 在 Windows 上强制 `PYTHONUTF8=1` + `PYTHONIOENCODING=utf-8`，pip/uvicorn 子进程一律加 `-X utf8`；
-  3. `start.cmd` 开头 `chcp 65001` + 设置同样环境变量 + `python -X utf8 run.py %*`（支持参数透传，如 `start.cmd --check`）；`start.ps1` 同步处理；python 不存在时提示安装并回退 `py -3`。
-- 干净环境验证：新建空 venv（不删旧环境），在 cp936 代码页下执行 `start.cmd --python .venv-clean\Scripts\python.exe --check`，走真实首次安装→构建→测试全链路（结果见 13.4）。
+  3. `start.cmd` 开头 `chcp 65001` + 设置同样环境变量 + `python -X utf8 run.py %*`（支持参数透传，如 `start.cmd --check`）；`start.ps1` 同步处理；python 不存在时提示安装并回退 `py -3`。末尾改为**失败才 `pause`**——双击运行时错误信息仍会留在窗口，而自动化（CI、`start.cmd --check`）不会再卡在按键等待。
+- 干净环境验证：新建空 venv（不删旧环境），在 cp936 代码页下执行 `start.cmd --python .venv-verify\Scripts\python.exe --check`，走真实首次安装→构建→测试全链路（结果见 13.4）。
 
 ### 13.4 本轮验证记录
 
 - SQLite 全套：135 项（128 passed + 7 项 PG 专属跳过）。
 - 真实 PostgreSQL 16.2 全套：135 项全部通过（116 旧 + 19 新），迁移在 PG 上自动建到 schema_version=2。
-- 干净安装：`start.cmd --check` 在 cp936 下从零装依赖、构建前端、跑双端测试（输出见交付包 `docs/backend-03-test-output.txt`）。
-- 30 秒轮询额度实测（设备凭据，7 次 × 30 秒）：见下表。
+- 干净安装（cp936 代码页、清空 `PYTHONUTF8`/`PYTHONIOENCODING`、全新空 venv Python 3.13.14、stdin 关闭）：
+  `pip` 解析 `requirements.txt` 无任何解码错误 → 装完全部依赖 → `tsc -b` + `vite build` → 前端 node 测试 4 项通过 → 后端 `128 passed, 7 skipped` → `EXIT=0`，耗时 1m55s。
+  完整原始日志：`docs/backend-03-clean-install.log`（154 行，`UnicodeDecodeError` 出现 0 次）。
+
+- 30 秒轮询额度实测（`tools/poll_quota_probe.py`，跑在**真实 PostgreSQL** 实例上的服务，设备只读凭据，6 次 × 30 秒）：
+
+| 指标 | 实测值 | 说明 |
+|---|---|---|
+| agenda 状态序列 | `200,304,200,304,200,304,200,304,200,304,200,304` | 每次先取 200，再带 `If-None-Match` 得 304，无失败 |
+| revision 种类 | 1（`f2a533c7…`） | 纯轮询不产生新版本，不会误报冲突 |
+| ETag 种类 | 1（与 revision 同值） | 内容不变时 ETag 稳定，304 才有意义 |
+| 304 命中 | 6 / 6 | 每次都命中缓存 |
+| `last_request_at` 写入次数 | 3（6 次轮询耗时 2.5 分钟） | 服务端 60 秒节流精确生效，读操作不放大写压力 |
+| AI 额度消耗 | 0（只留下当天日期键） | 轮询不触发任何模型调用 |
+
 - PostgreSQL 重启持久化（`tools/persistence_probe.py`）：写会话+设备凭据+任务 → **杀进程重启** → 会话 200、设备 200、任务仍在。
+- 登录闭环活体复测（PG 实例，最新代码）：`/api/auth/config` 200（`sandbox_mode=true`、4 成员、`session_ttl_minutes=180`）→ 登录 200 → `/api/me`、`/api/users/B/state` 200 → agenda 200 + 304 → 退出 200 → 原令牌立即 `401 session_revoked` 且带 `WWW-Authenticate` → 设备凭据读 agenda 200、写任务 `403 device_forbidden`。
 - 全程未在文档/输出中记录任何明文凭据。
 
 ### 13.5 本轮后仍未完成（需要账号/网络，代码侧已就绪）

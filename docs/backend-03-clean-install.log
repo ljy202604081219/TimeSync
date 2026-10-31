@@ -1,0 +1,154 @@
+Looking in indexes: https://mirrors.aliyun.com/pypi/simple
+Collecting fastapi==0.162.0 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 10))
+  Using cached fastapi-0.162.0-py3-none-any.whl (148 kB)
+Collecting starlette==0.52.1 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 11))
+[safe-delete][SAFE_DELETE_FAIL_CLOSED] {"target": "c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\f\\4\\2\\c\\5\\f42c57f81d8d0a0b0931a64955e25bbc5021850c3deecbac7b84fcc0.body", "reason": "trash-failed", "detail": "[safe-delete] 操作失败: ERROR c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\f\\4\\2\\c\\5\\f42c57f81d8d0a0b0931a64955e25bbc5021850c3deecbac7b84fcc0.body: Error during a `trash` operation: Unknown { description: \"Some operations were aborted\" }"}
+  Downloading starlette-0.52.1-py3-none-any.whl (74 kB)
+Collecting uvicorn==0.54.0 (from uvicorn[standard]==0.54.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 12))
+  Using cached uvicorn-0.54.0-py3-none-any.whl (87 kB)
+Collecting SQLAlchemy==2.0.55 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 13))
+  Using cached sqlalchemy-2.0.55-cp313-cp313-win_amd64.whl (2.2 MB)
+Collecting psycopg==3.3.6 (from psycopg[binary]==3.3.6->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 14))
+  Using cached psycopg-3.3.6-py3-none-any.whl (215 kB)
+Collecting ortools==9.14.6206 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 15))
+  Using cached ortools-9.14.6206-cp313-cp313-win_amd64.whl (20.5 MB)
+Collecting pytest==8.4.2 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 16))
+[safe-delete][SAFE_DELETE_FAIL_CLOSED] {"target": "c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\a\\3\\0\\5\\9\\a30599b08c7595881cb14e7c5824e543fd61c066766ba3e4359a172a.body", "reason": "trash-failed", "detail": "[safe-delete] 操作失败: ERROR c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\a\\3\\0\\5\\9\\a30599b08c7595881cb14e7c5824e543fd61c066766ba3e4359a172a.body: Error during a `trash` operation: Unknown { description: \"Some operations were aborted\" }"}
+  Downloading pytest-8.4.2-py3-none-any.whl (365 kB)
+Collecting httpx==0.28.1 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 17))
+  Using cached httpx-0.28.1-py3-none-any.whl (73 kB)
+Collecting python-multipart==0.0.32 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 18))
+  Using cached python_multipart-0.0.32-py3-none-any.whl (30 kB)
+Collecting python-dotenv==1.1.1 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 19))
+  Using cached python_dotenv-1.1.1-py3-none-any.whl (20 kB)
+Collecting numpy==2.2.6 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 20))
+[safe-delete][SAFE_DELETE_FAIL_CLOSED] {"target": "c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\e\\5\\d\\f\\d\\e5dfd59562b0ee9b15e0fdc2dfb261e4826f7aca42a05444bb72252c.body", "reason": "trash-failed", "detail": "[safe-delete] 操作失败: ERROR c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\e\\5\\d\\f\\d\\e5dfd59562b0ee9b15e0fdc2dfb261e4826f7aca42a05444bb72252c.body: Error during a `trash` operation: Unknown { description: \"Some operations were aborted\" }"}
+  Downloading numpy-2.2.6-cp313-cp313-win_amd64.whl (12.6 MB)
+     ---------------------------------------- 12.6/12.6 MB 3.3 MB/s  0:00:03
+Collecting pandas==2.3.3 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 21))
+[safe-delete][SAFE_DELETE_FAIL_CLOSED] {"target": "c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\1\\e\\9\\e\\6\\1e9e6eafc36c6751247af78c30f8b5270a9473bde28016aefd0e2cc8.body", "reason": "trash-failed", "detail": "[safe-delete] 操作失败: ERROR c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\1\\e\\9\\e\\6\\1e9e6eafc36c6751247af78c30f8b5270a9473bde28016aefd0e2cc8.body: Error during a `trash` operation: Unknown { description: \"Some operations were aborted\" }"}
+  Downloading pandas-2.3.3-cp313-cp313-win_amd64.whl (11.0 MB)
+     ---------------------------------------- 11.0/11.0 MB 2.9 MB/s  0:00:03
+Collecting pydantic==2.12.3 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 22))
+  Using cached pydantic-2.12.3-py3-none-any.whl (462 kB)
+Collecting greenlet==3.2.4 (from -r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 23))
+  Using cached greenlet-3.2.4-cp313-cp313-win_amd64.whl (299 kB)
+Collecting typing-extensions>=4.8.0 (from fastapi==0.162.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 10))
+  Using cached typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Collecting typing-inspection>=0.4.2 (from fastapi==0.162.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 10))
+  Using cached typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Collecting annotated-doc>=0.0.2 (from fastapi==0.162.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 10))
+  Using cached annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+Collecting opentelemetry-api>=1.44.0 (from fastapi==0.162.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 10))
+  Using cached opentelemetry_api-1.45.2-py3-none-any.whl (60 kB)
+Collecting anyio<5,>=3.6.2 (from starlette==0.52.1->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 11))
+  Using cached anyio-4.15.1-py3-none-any.whl (132 kB)
+Collecting click>=7.0 (from uvicorn==0.54.0->uvicorn[standard]==0.54.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 12))
+  Using cached click-8.5.0-py3-none-any.whl (125 kB)
+Collecting h11>=0.8 (from uvicorn==0.54.0->uvicorn[standard]==0.54.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 12))
+  Using cached h11-0.16.0-py3-none-any.whl (37 kB)
+Collecting tzdata (from psycopg==3.3.6->psycopg[binary]==3.3.6->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 14))
+  Using cached tzdata-2026.6-py2.py3-none-any.whl (348 kB)
+Collecting absl-py>=2.0.0 (from ortools==9.14.6206->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 15))
+  Using cached absl_py-2.5.1-py3-none-any.whl (137 kB)
+Collecting protobuf<6.32,>=6.31.1 (from ortools==9.14.6206->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 15))
+  Using cached protobuf-6.31.1-cp310-abi3-win_amd64.whl (435 kB)
+Collecting immutabledict>=3.0.0 (from ortools==9.14.6206->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 15))
+[safe-delete][SAFE_DELETE_FAIL_CLOSED] {"target": "c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\d\\2\\3\\8\\d\\d238dff6c70b27f8d882cf47b7d6a97bcbbc10a07afbf397b7befe9f.body", "reason": "trash-failed", "detail": "[safe-delete] 操作失败: ERROR c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\d\\2\\3\\8\\d\\d238dff6c70b27f8d882cf47b7d6a97bcbbc10a07afbf397b7befe9f.body: Error during a `trash` operation: Unknown { description: \"Some operations were aborted\" }"}
+  Downloading immutabledict-4.3.1-py3-none-any.whl (5.0 kB)
+Collecting colorama>=0.4 (from pytest==8.4.2->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 16))
+  Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Collecting iniconfig>=1 (from pytest==8.4.2->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 16))
+  Using cached iniconfig-2.3.1-py3-none-any.whl (7.6 kB)
+Collecting packaging>=20 (from pytest==8.4.2->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 16))
+  Using cached packaging-26.3-py3-none-any.whl (129 kB)
+Collecting pluggy<2,>=1.5 (from pytest==8.4.2->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 16))
+  Using cached pluggy-1.7.0-py3-none-any.whl (27 kB)
+Collecting pygments>=2.7.2 (from pytest==8.4.2->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 16))
+  Using cached pygments-2.21.0-py3-none-any.whl (1.3 MB)
+Collecting certifi (from httpx==0.28.1->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 17))
+  Using cached certifi-2026.10.23-py3-none-any.whl (135 kB)
+Collecting httpcore==1.* (from httpx==0.28.1->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 17))
+  Using cached httpcore-1.0.9-py3-none-any.whl (78 kB)
+Collecting idna (from httpx==0.28.1->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 17))
+  Using cached idna-3.20-py3-none-any.whl (69 kB)
+Collecting python-dateutil>=2.8.2 (from pandas==2.3.3->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 21))
+  Using cached python_dateutil-3.0.0-py2.py3-none-any.whl (94 kB)
+Collecting pytz>=2020.1 (from pandas==2.3.3->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 21))
+  Using cached pytz-2026.6-py2.py3-none-any.whl (506 kB)
+Collecting annotated-types>=0.6.0 (from pydantic==2.12.3->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 22))
+  Using cached annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Collecting pydantic-core==2.41.4 (from pydantic==2.12.3->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 22))
+  Using cached pydantic_core-2.41.4-cp313-cp313-win_amd64.whl (2.0 MB)
+Collecting psycopg-binary==3.3.6 (from psycopg[binary]==3.3.6->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 14))
+  Using cached psycopg_binary-3.3.6-cp313-cp313-win_amd64.whl (3.7 MB)
+Collecting httptools>=0.8.0 (from uvicorn[standard]==0.54.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 12))
+  Using cached httptools-0.9.0-cp313-cp313-win_amd64.whl (91 kB)
+Collecting pyyaml>=5.1 (from uvicorn[standard]==0.54.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 12))
+[safe-delete][SAFE_DELETE_FAIL_CLOSED] {"target": "c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\4\\9\\b\\1\\5\\49b159f5740468e05322ada3b4062e5f65ba7337f716e75fbcf26f51.body", "reason": "trash-failed", "detail": "[safe-delete] 操作失败: ERROR c:\\users\\sna\\appdata\\local\\pip\\cache\\http-v2\\4\\9\\b\\1\\5\\49b159f5740468e05322ada3b4062e5f65ba7337f716e75fbcf26f51.body: Error during a `trash` operation: Unknown { description: \"Some operations were aborted\" }"}
+  Downloading pyyaml-6.0.3-cp313-cp313-win_amd64.whl (154 kB)
+Collecting watchfiles>=0.20 (from uvicorn[standard]==0.54.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 12))
+  Using cached watchfiles-1.3.0-cp310-abi3-win_amd64.whl (290 kB)
+Collecting websockets>=13.0 (from uvicorn[standard]==0.54.0->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 12))
+  Downloading websockets-17.4-cp313-cp313-win_amd64.whl (219 kB)
+Collecting six>=1.6 (from python-dateutil>=2.8.2->pandas==2.3.3->-r C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\backend\requirements.txt (line 21))
+  Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+Installing collected packages: pytz, websockets, tzdata, typing-extensions, six, pyyaml, python-multipart, python-dotenv, pygments, psycopg-binary, protobuf, pluggy, packaging, numpy, iniconfig, immutabledict, idna, httptools, h11, greenlet, colorama, click, certifi, annotated-types, annotated-doc, absl-py, uvicorn, typing-inspection, SQLAlchemy, python-dateutil, pytest, pydantic-core, psycopg, opentelemetry-api, httpcore, anyio, watchfiles, starlette, pydantic, pandas, httpx, ortools, fastapi
+
+Successfully installed SQLAlchemy-2.0.55 absl-py-2.5.1 annotated-doc-0.0.5 annotated-types-0.8.0 anyio-4.15.1 certifi-2026.10.23 click-8.5.0 colorama-0.4.6 fastapi-0.162.0 greenlet-3.2.4 h11-0.16.0 httpcore-1.0.9 httptools-0.9.0 httpx-0.28.1 idna-3.20 immutabledict-4.3.1 iniconfig-2.3.1 numpy-2.2.6 opentelemetry-api-1.45.2 ortools-9.14.6206 packaging-26.3 pandas-2.3.3 pluggy-1.7.0 protobuf-6.31.1 psycopg-3.3.6 psycopg-binary-3.3.6 pydantic-2.12.3 pydantic-core-2.41.4 pygments-2.21.0 pytest-8.4.2 python-dateutil-3.0.0 python-dotenv-1.1.1 python-multipart-0.0.32 pytz-2026.6 pyyaml-6.0.3 six-1.17.0 starlette-0.52.1 typing-extensions-4.16.0 typing-inspection-0.4.4 tzdata-2026.6 uvicorn-0.54.0 watchfiles-1.3.0 websockets-17.4
+
+[notice] A new release of pip is available: 26.1.2 -> 26.2.2
+[notice] To update, run: C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\.venv-verify\Scripts\python.exe -m pip install --upgrade pip
+[36mvite v7.1.12 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 1588 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.43 kB[22m[1m[22m[2m │ gzip:  0.33 kB[22m
+[2mdist/[22m[35massets/index-DqT24ite.css  [39m[1m[2m 44.59 kB[22m[1m[22m[2m │ gzip: 10.58 kB[22m
+[2mdist/[22m[36massets/index-Ce-Dp0vb.js   [39m[1m[2m271.06 kB[22m[1m[22m[2m │ gzip: 84.27 kB[22m
+[32m✓ built in 4.69s[39m
+TAP version 13
+# Subtest: calendar opens the imported week independently of the planning window
+ok 1 - calendar opens the imported week independently of the planning window
+  ---
+  duration_ms: 1.9251
+  type: 'test'
+  ...
+# Subtest: December concrete and weekly classes render outside November solver window
+ok 2 - December concrete and weekly classes render outside November solver window
+  ---
+  duration_ms: 4.2854
+  type: 'test'
+  ...
+# Subtest: date navigation stays correct across month/year boundaries
+ok 3 - date navigation stays correct across month/year boundaries
+  ---
+  duration_ms: 0.2966
+  type: 'test'
+  ...
+# Subtest: overlapping imported and existing courses remain side by side
+ok 4 - overlapping imported and existing courses remain side by side
+  ---
+  duration_ms: 0.5667
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 282.4038
+........................................................................ [ 53%]
+..................sssssss......................................          [100%]
+============================== warnings summary ===============================
+..\.venv-verify\Lib\site-packages\starlette\testclient.py:45
+  C:\Users\sna\WorkBuddy\2026-10-30-20-30-08\work\TimeSync\.venv-verify\Lib\site-packages\starlette\testclient.py:45: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+128 passed, 7 skipped, 1 warning in 14.25s
+TimeSync: backend tests, TypeScript and production build passed.
