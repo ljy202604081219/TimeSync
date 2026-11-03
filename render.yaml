@@ -43,6 +43,10 @@ services:
         generateValue: true
       - key: ASSISTANT_MODE
         value: auto
+      - key: ASSISTANT_AUTO_CREATE
+        value: "true"
+      - key: ASSISTANT_TIMEOUT_SECONDS
+        value: "60"
       - key: AI_ADMIN_UI
         value: "false"
       # MiMo：Key 只放平台 Secret
@@ -57,6 +61,10 @@ services:
       # 费用与体积保护
       - key: AI_BUDGET_ENABLED
         value: "false"
+      - key: AI_DAILY_BUDGET
+        value: "20"
+      - key: AI_ACTOR_DAILY_BUDGET
+        value: "5"
       - key: AI_MAX_CONCURRENCY
         value: "1"
       - key: MAX_REQUEST_BYTES
