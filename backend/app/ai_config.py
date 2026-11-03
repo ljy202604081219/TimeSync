@@ -21,7 +21,7 @@ class SettingsInput(BaseModel):
     api_key: SecretStr = SecretStr('')
 
 def status():
-    return {'provider':os.getenv('AI_PROVIDER','openai-compatible'),'base_url':os.getenv('AI_BASE_URL',BASE),'model':os.getenv('AI_MODEL',MODEL),'has_key':bool(os.getenv('AI_API_KEY')),'mode':'live' if os.getenv('AI_API_KEY') else 'demo'}
+    return {'provider':os.getenv('AI_PROVIDER','openai-compatible'),'base_url':os.getenv('AI_BASE_URL',BASE),'model':os.getenv('AI_MODEL',MODEL),'has_key':bool(os.getenv('AI_API_KEY')),'mode':'live' if os.getenv('AI_API_KEY') else 'demo','assistant_mode':os.getenv('ASSISTANT_MODE','auto')}
 
 def resolved(data):
     base=data.base_url.strip().rstrip('/')
@@ -69,5 +69,7 @@ async def test_and_save(data):
         response.raise_for_status()
         output=json.loads(response.json()['choices'][0]['message']['content'])
         if output.get('ok') is not True: raise ValueError('连接测试未返回预期 JSON，配置尚未保存。')
-    save(values)
-    return {**status(),'tested':True,'notice':'文本与 JSON 调用测试成功，配置已生效。截图能力请在 DDL 页面用实际图片另行验证。'}
+    # Saving a working service must also release a previously forced demo
+    # assistant, including a process-level mock override used for UI testing.
+    save({**values,'ASSISTANT_MODE':'auto'})
+    return {**status(),'tested':True,'notice':'项目 AI 服务连接成功，已启用助手自动模式；所有登录成员共用服务端配置，不需要个人 Key。截图能力请用实际图片另行验证。'}

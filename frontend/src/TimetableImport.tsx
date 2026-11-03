@@ -1,3 +1,4 @@
+import { requestId } from "./requestId";
 import { useEffect, useState } from "react";
 import {
   Upload,
@@ -83,7 +84,7 @@ export default function TimetableImport({
     setCourses((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: requestId(),
         selected: true,
         title: "",
         weekday: "",
@@ -143,7 +144,7 @@ export default function TimetableImport({
             setCourses(
               result.data.courses.map((r: Data) => ({
                 ...r,
-                id: crypto.randomUUID(),
+                id: requestId(),
                 selected: true,
                 title: r.title || "",
                 weekday: r.weekday ?? "",

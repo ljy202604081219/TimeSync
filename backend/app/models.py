@@ -2,6 +2,84 @@ from sqlalchemy import String, Integer, ForeignKey, JSON, UniqueConstraint, Inde
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
+class QQGroup(Base):
+    __tablename__='qq_groups'
+    __table_args__=(UniqueConstraint('owner_id','group_id','bot_id'),)
+    id: Mapped[int]=mapped_column(primary_key=True)
+    owner_id: Mapped[str]=mapped_column(ForeignKey('users.id'),index=True)
+    group_id: Mapped[str]=mapped_column(String(32))
+    bot_id: Mapped[str]=mapped_column(String(32),default='synthetic')
+    name: Mapped[str]=mapped_column(String(100))
+    enabled: Mapped[bool]=mapped_column(default=True)
+    consent: Mapped[bool]=mapped_column(default=False)
+    synthetic: Mapped[bool]=mapped_column(default=True)
+    ai_images: Mapped[bool]=mapped_column(default=False)
+    retention_days: Mapped[int]=mapped_column(default=3)
+    connection: Mapped[str]=mapped_column(String(20),default='unconfigured')
+    last_seen_at: Mapped[str | None]=mapped_column(String(40),nullable=True)
+    last_synced_at: Mapped[str | None]=mapped_column(String(40),nullable=True)
+    history_cursor: Mapped[str | None]=mapped_column(String(100),nullable=True)
+    created_at: Mapped[str]=mapped_column(String(40))
+
+class QQNotice(Base):
+    __tablename__='qq_notices'
+    __table_args__=(UniqueConstraint('owner_id','fingerprint'),)
+    id: Mapped[int]=mapped_column(primary_key=True)
+    owner_id: Mapped[str]=mapped_column(ForeignKey('users.id'),index=True)
+    fingerprint: Mapped[str]=mapped_column(String(64))
+    event_key: Mapped[str]=mapped_column(String(64),index=True)
+    title: Mapped[str]=mapped_column(String(160))
+    category: Mapped[str]=mapped_column(String(32))
+    importance: Mapped[str]=mapped_column(String(16),default='normal')
+    operation: Mapped[str]=mapped_column(String(16),default='new')
+    status: Mapped[str]=mapped_column(String(32),default='pending_confirmation',index=True)
+    deadline: Mapped[str | None]=mapped_column(String(40),nullable=True)
+    extraction: Mapped[dict]=mapped_column(JSON,default=dict)
+    mode: Mapped[str]=mapped_column(String(16),default='mock')
+    related_id: Mapped[int | None]=mapped_column(ForeignKey('qq_notices.id',ondelete='SET NULL'),nullable=True)
+    task_id: Mapped[int | None]=mapped_column(ForeignKey('tasks.id',ondelete='SET NULL'),nullable=True)
+    busy_id: Mapped[int | None]=mapped_column(ForeignKey('busy_intervals.id',ondelete='SET NULL'),nullable=True)
+    base_task: Mapped[dict]=mapped_column(JSON,default=dict)
+    created_at: Mapped[str]=mapped_column(String(40))
+
+class QQMessage(Base):
+    __tablename__='qq_messages'
+    __table_args__=(UniqueConstraint('group_config_id','message_id'),)
+    id: Mapped[int]=mapped_column(primary_key=True)
+    owner_id: Mapped[str]=mapped_column(ForeignKey('users.id'),index=True)
+    group_config_id: Mapped[int]=mapped_column(ForeignKey('qq_groups.id'),index=True)
+    message_id: Mapped[str]=mapped_column(String(100))
+    sent_at: Mapped[str]=mapped_column(String(40),index=True)
+    received_at: Mapped[str]=mapped_column(String(40))
+    expires_at: Mapped[str]=mapped_column(String(40),index=True)
+    raw_text: Mapped[str]=mapped_column(default='')
+    images: Mapped[list]=mapped_column(JSON,default=list)
+    content_hash: Mapped[str]=mapped_column(String(64))
+    status: Mapped[str]=mapped_column(String(24),default='queued',index=True)
+    notice_id: Mapped[int | None]=mapped_column(ForeignKey('qq_notices.id',ondelete='SET NULL'),nullable=True,index=True)
+    attempts: Mapped[int]=mapped_column(default=0)
+    claim: Mapped[str]=mapped_column(String(36),default='')
+    claimed_at: Mapped[str | None]=mapped_column(String(40),nullable=True)
+    retry_at: Mapped[str | None]=mapped_column(String(40),nullable=True)
+    error: Mapped[str]=mapped_column(String(240),default='')
+
+class AssistantThread(Base):
+    __tablename__ = 'assistant_threads'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    revision: Mapped[int] = mapped_column(default=0)
+    messages: Mapped[list] = mapped_column(JSON, default=list)
+    context: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[str]
+
+class AssistantProposal(Base):
+    __tablename__ = 'assistant_proposals'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    snapshot: Mapped[str]
+    expires_at: Mapped[str]
+
 class User(Base):
     __tablename__ = 'users'
     id: Mapped[str] = mapped_column(String, primary_key=True)

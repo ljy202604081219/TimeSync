@@ -1,3 +1,4 @@
+import { requestId } from "./requestId";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
@@ -24,6 +25,7 @@ import {
   Settings2,
   LogOut,
   Menu,
+  Sparkles,
 } from "lucide-react";
 import {
   Data,
@@ -37,9 +39,12 @@ import {
   SolveResult,
   Changes,
 } from "./ui";
+import Assistant from "./Assistant";
+import QQCenter from "./QQCenter";
 import Calendar from "./Calendar";
 import Team from "./Team";
 import AISettings from "./AISettings";
+import FreeTimePanel from "./FreeTimePanel";
 import TimetableImport from "./TimetableImport";
 import { TaskForm, ExtractPanel, RepairPanel, Settings } from "./Forms";
 import {
@@ -58,23 +63,26 @@ const pages = [
   { id: "home", name: "概览", icon: LayoutDashboard },
   { id: "tasks", name: "DDL 管理", icon: ListTodo },
   { id: "calendar", name: "个人日历", icon: CalendarDays },
-  { id: "schedule", name: "智能排程", icon: WandSparkles },
-  { id: "repair", name: "动态修复", icon: RefreshCw },
+  { id: "schedule", name: "计划工作台", icon: WandSparkles },
   { id: "team", name: "多人协调", icon: Users },
+  { id: "qq", name: "QQ 消息", icon: Bell },
+  { id: "assistant", name: "AI 助手", icon: Sparkles },
 ];
 const titles: Record<string, [string, string]> = {
-  home: ["把时间，留给重要的事。", "你的任务、计划与伙伴，在这里有序相聚。"],
+  qq: ["QQ 通知", "授权收录、AI识别、核对确认，与个人排程相连。"],
+  assistant: ["问清安排，再确认改变。", "查询真实日程，让每次修改都有依据。"],
+  home: ["日程概览", "查看日程、近期截止与待处理事项。"],
   tasks: [
-    "每一个截止，都心中有数。",
+    "任务与截止时间",
     "从一条通知开始，把模糊的信息变成可执行的任务。",
   ],
-  calendar: ["这一周，一目了然。", "课程、专注时间和会议，都有自己的位置。"],
+  calendar: ["我的日历", "课程、专注时间和会议，都有自己的位置。"],
   schedule: [
-    "让计划，适合你的节奏。",
+    "计划工作台",
     "在真实约束下安排任务，把改动控制在最小。",
   ],
   repair: ["变化来了，计划跟得上。", "加入突发事件，先比较，再确认新的安排。"],
-  team: ["找到大家都合适的时间。", "只共享忙闲，保留每个人的私人日程。"],
+  team: ["多人时间协调", "只共享忙闲，保留每个人的私人日程。"],
 };
 export default function App() {
   const [page, setPage] = useState("home"),
@@ -92,6 +100,9 @@ export default function App() {
     [loading, setLoading] = useState(false),
     [working, setWorking] = useState(false),
     [mobile, setMobile] = useState(false),
+    [assistantOpen, setAssistantOpen] = useState(false),
+    [calendarFocus,setCalendarFocus] = useState<{date:string;revision:number}|null>(null),
+    [planMode, setPlanMode] = useState<"plan" | "repair">("plan"),
     [taskEdit, setTaskEdit] = useState<Data | "new" | null>(null),
     [extractOpen, setExtractOpen] = useState(false),
     [settings, setSettings] = useState(false),
@@ -101,6 +112,12 @@ export default function App() {
     [repairResult, setRepairResult] = useState<Data | null>(null),
     [version, setVersion] = useState<Data | null>(null),
     [sessionLeft, setSessionLeft] = useState<number | null>(null);
+  const assistantDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = assistantDialog.current; if (!dialog) return;
+    if (assistantOpen && !dialog.open) { dialog.showModal(); dialog.focus(); }
+    if (!assistantOpen && dialog.open) dialog.close();
+  }, [assistantOpen, me?.id]);
   const token = auth?.token ?? "";
   const currentToken = useRef(token);
   currentToken.current = token;
@@ -110,11 +127,13 @@ export default function App() {
     body?: unknown,
     form = false,
   ): Promise<any> {
+    if (!navigator.onLine) throw new Error("当前离线，请恢复网络后重试；没有提交操作。");
     const response = await fetch("/api" + path, {
+      cache: "no-store",
       method,
       headers: {
         ...(token ? { Authorization: "Bearer " + token } : {}),
-        ...(method !== "GET" ? { "Idempotency-Key": crypto.randomUUID() } : {}),
+        ...(method !== "GET" ? { "Idempotency-Key": path.startsWith("/v1/assistant/proposals/") ? "assistant-confirm:" + path.split("/")[4] : requestId() } : {}),
         ...(!form && body !== undefined
           ? { "Content-Type": "application/json" }
           : {}),
@@ -173,6 +192,9 @@ export default function App() {
     window.setTimeout(() => setToast(""), 5000);
   }
   function applyAuth(session: AuthSession | null, message = "") {
+    setMobile(false);
+    setAssistantOpen(false);
+    setCalendarFocus(null);
     saveAuth(session);
     currentToken.current = session?.token ?? "";
     setAuth(session);
@@ -206,7 +228,9 @@ export default function App() {
     applyAuth({ token: value, kind: "manual", user: null, expires_at: null });
   }
   function navigate(id: string) {
-    setPage(id);
+    if (id === "assistant") { setAssistantOpen(true); setMobile(false); return; }
+    if (id === "repair") { setPage("schedule"); setPlanMode("repair"); }
+    else { setPage(id); if (id === "schedule") setPlanMode("plan"); }
     setMobile(false);
   }
   useEffect(() => {
@@ -239,6 +263,7 @@ export default function App() {
     let alive = true;
     setLoading(true);
     setState(null);
+    setAssistantOpen(false);
     setRepairResult(null);
     setPlanResult(null);
     setTaskEdit(null);
@@ -260,6 +285,12 @@ export default function App() {
       alive = false;
     };
   }, [token]);
+  useEffect(() => {
+    const recover = () => { if (token) refresh().catch(e => setError(e.message)); };
+    window.addEventListener("online",recover);
+    return () => window.removeEventListener("online",recover);
+  }, [token]);
+  useEffect(() => { document.body.dataset.authenticated = me ? "true" : "false"; }, [me]);
   const brand = (
     <>
       <span className="brand-icon">
@@ -433,7 +464,8 @@ export default function App() {
           {pages.map((p) => (
             <button
               key={p.id}
-              className={page === p.id ? "active" : ""}
+              className={(page === p.id || (p.id === "assistant" && assistantOpen)) ? "active" : ""}
+              aria-label={p.id === "assistant" ? "打开AI助手" : undefined}
               onClick={() => navigate(p.id)}
             >
               <p.icon size={19} />
@@ -445,20 +477,7 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-tip">
-          <div className="tip-icon">
-            <WandSparkles size={20} />
-          </div>
-          <b>计划会变，节奏不乱</b>
-          <p>
-            临时多了一场实验？
-            <br />
-            让时聚帮你重新安排。
-          </p>
-          <button onClick={() => navigate("repair")}>
-            试试动态修复 <ArrowUpRight size={15} />
-          </button>
-        </div>
+        <button className="sidebar-install" onClick={()=>window.dispatchEvent(new Event("timesync-install"))}>安装 TimeSync 到桌面</button>
         <div className="sidebar-bottom">
           <span className={"avatar " + u.id}>{u.id}</span>
           <div>
@@ -488,6 +507,7 @@ export default function App() {
       {mobile && (
         <div className="sidebar-shade" onClick={() => setMobile(false)} />
       )}
+      <nav className="mobile-bottom-nav" aria-label="手机底部导航">{["home","calendar","tasks","schedule","team","qq","assistant"].map(id=>{const p=pages.find(p=>p.id===id)!;return <button key={id} className={(id==="assistant"?assistantOpen:page===id&&!assistantOpen)?"active":""} onClick={()=>navigate(id)} aria-label={p.name} aria-current={page===id?"page":undefined}><p.icon size={21}/><span>{({home:"概览",calendar:"日历",tasks:"任务",schedule:"计划",team:"协同",qq:"QQ",assistant:"AI"} as Record<string,string>)[id]}</span></button>;})}</nav>
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
@@ -503,12 +523,12 @@ export default function App() {
             <b>{pages.find((p) => p.id === page)?.name}</b>
           </div>
           <div className="top-actions">
-            {u.id === "A" && (
+            {u.ai_configuration_allowed && (
               <button
                 className="btn secondary"
                 onClick={() => setAISettings(true)}
               >
-                MiMo 接入
+                项目 AI 管理
               </button>
             )}
             <span className="timezone">
@@ -529,9 +549,6 @@ export default function App() {
         <main>
           <div className="page-heading">
             <div>
-              <div className="eyebrow">
-                {page === "home" ? "TIME WELL SPENT" : "YOUR TIME, IN SYNC"}
-              </div>
               <h1>{titles[page][0]}</h1>
               <p>{titles[page][1]}</p>
             </div>
@@ -577,16 +594,12 @@ export default function App() {
               ) : null}
             </div>
           </div>
-          <div className="demo-banner">
+          <div className="demo-banner workspace-context">
             <span>
               <span className="demo-tag">演示空间</span>{" "}
-              四人身份用于本地联调 · 课表与任务由你添加 · 计划窗口 {md(u.window_start)}–
-              {md(u.window_end)} / {u.window_start.slice(0, 4)}
+              {authConfig?.sandbox_mode ? "共享演示沙箱 · 合成数据" : "四人联调身份"} · 计划窗口 {md(u.window_start)}–{md(u.window_end)}
             </span>
-            <span>
-              {u.ai_mode === "demo" ? "AI 未配置 · 规则演示" : "视觉模型已配置"}
-              <ShieldCheck size={14} />
-            </span>
+            <span>{page === "schedule" ? "生成、修复与版本统一管理" : "上海时间 UTC+8"}</span>
           </div>
           {error && (
             <div className="alert error" role="alert">
@@ -675,8 +688,8 @@ export default function App() {
                   <div className="section-heading">
                     <div>
                       <h2>
-                        本周时间地图{" "}
-                        <span className="subtle">WEEKLY OVERVIEW</span>
+                        日程一览{" "}
+                        
                       </h2>
                       <p>
                         {!s.plan ? "显示你的课表；添加任务并设置可用时段后可生成计划。" : s.plan_valid
@@ -740,13 +753,13 @@ export default function App() {
                       <span className="sync-orbit">
                         <Users size={22} />
                       </span>
-                      <Badge>一起，刚刚好</Badge>
+                      <Badge>多人协调</Badge>
                     </div>
-                    <h2>少一点“你什么时候有空”</h2>
+                    <h2>找到共同空档</h2>
                     <p>
                       四人忙闲自动求交，
                       <br />
-                      把来回沟通留给有趣的事。
+                      全员确认后，会议才会确定。
                     </p>
                     <div className="avatar-stack">
                       {"ABCD".split("").map((m) => (
@@ -775,14 +788,14 @@ export default function App() {
                   <p>
                     {pending.length
                       ? `${pending.length} 场会议等待你的答复。`
-                      : "试试加入“周三 14:00–16:00 临时实验”，看看计划如何调整。"}
+                      : "新增突发事件，先查看影响，再确认修复方案。"}
                   </p>
                 </div>
                 <Button
                   secondary
                   onClick={() => navigate(pending.length ? "team" : "repair")}
                 >
-                  {pending.length ? "查看邀请" : "体验动态修复"}
+                  {pending.length ? "查看邀请" : "调整计划"}
                   <ArrowUpRight size={15} />
                 </Button>
               </section>
@@ -813,7 +826,7 @@ export default function App() {
                   <span className="subtle">优先级在满足硬约束后参与优化</span>
                 </div>
                 <div className="table-scroll">
-                  <table>
+                  <table className="task-table">
                     <thead>
                       <tr>
                         <th>任务 / 提交要求</th>
@@ -827,7 +840,7 @@ export default function App() {
                     <tbody>
                       {recent.map((t) => (
                         <tr key={t.id}>
-                          <td>
+                          <td data-label="任务">
                             <b>{t.title}</b>
                             <small>
                               {t.requirements || "未填写提交要求"}
@@ -835,17 +848,17 @@ export default function App() {
                                 ` · ${t.dependencies.length} 个前置任务`}
                             </small>
                           </td>
-                          <td>
+                          <td data-label="截止时间">
                             {md(t.deadline)}
                             <small>{hm(t.deadline)} · UTC+8</small>
                           </td>
-                          <td>{t.duration_minutes} 分钟</td>
-                          <td>
+                          <td data-label="预计耗时">{t.duration_minutes} 分钟</td>
+                          <td data-label="优先级">
                             <span className={"priority-label p" + t.priority}>
                               {["", "低", "中", "高"][t.priority]}
                             </span>
                           </td>
-                          <td>
+                          <td data-label="安排状态">
                             <Badge
                               status={
                                 planned.has(t.id) && s.plan_valid
@@ -858,7 +871,7 @@ export default function App() {
                                 : "待排程"}
                             </Badge>
                           </td>
-                          <td>
+                          <td data-label="操作">
                             <button
                               className="text-button"
                               onClick={() => setTaskEdit(t)}
@@ -882,7 +895,7 @@ export default function App() {
             <section className="card calendar-card">
               <div className="section-heading">
                 <div>
-                  <h2>个人周历</h2>
+                  <h2>个人日程</h2>
                   <p>
                     {!s.plan ? "当前显示上传的课表，尚未生成任务计划。" : s.plan_valid
                       ? "当前计划有效"
@@ -891,60 +904,45 @@ export default function App() {
                 </div>
                 <Badge>UTC+8</Badge>
               </div>
-              <Calendar state={s} me={u} meetings={meetings} />
+              <Calendar key={calendarFocus?.revision??0} state={s} me={u} meetings={meetings} focusDate={calendarFocus?.date} />
             </section>
           )}
-          {page === "schedule" && (
+          {page === "schedule" && <div className="planning-toolbar"><div role="tablist" aria-label="计划操作"><button role="tab" aria-selected={planMode==="plan"} onClick={()=>setPlanMode("plan")}>生成计划</button><button role="tab" aria-label="突发事件与修复" aria-selected={planMode==="repair"} onClick={()=>setPlanMode("repair")}>动态修复</button></div><button className="btn secondary" onClick={()=>setSettings(true)}><Settings2 size={16}/>时间设置</button></div>}
+          {page === "schedule" && planMode === "plan" && (
             <>
-              <div className="two-columns">
-                <section className="card optimizer-card">
-                  <span className="eyebrow">CONSTRAINTS FIRST</span>
-                  <h2>给每一项任务，找到合适的位置。</h2>
-                  <p>
-                    以 15 分钟为单位安排连续任务。课程、可用时间、DDL
-                    和任务依赖始终优先满足。
-                  </p>
-                  <div className="constraint-chips">
-                    {[
-                      "避开固定课程",
-                      "满足截止时间",
-                      "保持任务依赖",
-                      "无重复与重叠",
-                    ].map((t) => (
-                      <span key={t}>
-                        <Check size={14} />
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                  <Button disabled={working} onClick={generate}>
-                    <WandSparkles size={17} />
-                    生成并采用计划
-                  </Button>
-                  <small>保存新版本；求解失败会保留旧计划。</small>
-                </section>
-                <section className="card">
-                  <div className="section-heading">
-                    <h2>优化顺序</h2>
-                    <Badge>CP-SAT</Badge>
-                  </div>
-                  <ol className="goal-list">
-                    {[
-                      "尽量保留原有任务时间",
-                      "尽量减少开始时间的移动",
-                      "尽量减少任务间零碎空档",
-                      "最后考虑任务优先级",
-                    ].map((x, i) => (
-                      <li key={x}>
-                        <span>0{i + 1}</span>
-                        {x}
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              </div>
+              <section className="card optimizer-card unified-optimizer">
+                <div><h2>按现有约束生成计划</h2><p>自动避开课程与会议，满足DDL和依赖，优先保留原有安排。</p>
+                  <details className="solver-explanation"><summary>排程依据</summary><p>以15分钟为单位连续安排；优化顺序为改动任务数、移动距离、短碎片、优先级。不可行时保留旧计划并展示原因。</p></details>
+                </div>
+                <Button disabled={working} onClick={generate}><WandSparkles size={17}/>生成并采用计划</Button>
+              </section>
               {planResult && <SolveResult result={planResult} />}
-              <div className="two-columns wide-left">
+              <FreeTimePanel key={u.id} api={api} onApplied={refresh} onResult={r=>setPlanResult(r.scheduling)}/>
+            </>
+          )}
+          {page === "schedule" && planMode === "repair" && (
+            <RepairPanel
+              key={u.id}
+              result={repairResult}
+              busy={working}
+              state={s}
+              onPreview={(data) =>
+                run(async () =>
+                  setRepairResult(
+                    await api("/disruptions/preview", "POST", data),
+                  ),
+                )
+              }
+              onCommit={(data) =>
+                run(async () => {
+                  setRepairResult(await api("/disruptions", "POST", data));
+                  await refresh();
+                  notify("突发事件与修复结果已保存。");
+                })
+              }
+            />
+          )}
+          {page === "schedule" && <details className="plan-history"><summary>当前安排 · {s.versions.length}个历史版本</summary>              <div className="two-columns wide-left">
                 <section className="card">
                   <div className="section-heading">
                     <h2>当前安排</h2>
@@ -983,30 +981,8 @@ export default function App() {
                   </div>
                 </section>
               </div>
-            </>
-          )}
-          {page === "repair" && (
-            <RepairPanel
-              key={u.id}
-              result={repairResult}
-              busy={working}
-              state={s}
-              onPreview={(data) =>
-                run(async () =>
-                  setRepairResult(
-                    await api("/disruptions/preview", "POST", data),
-                  ),
-                )
-              }
-              onCommit={(data) =>
-                run(async () => {
-                  setRepairResult(await api("/disruptions", "POST", data));
-                  await refresh();
-                  notify("突发事件与修复结果已保存。");
-                })
-              }
-            />
-          )}
+</details>}
+          {page === "qq" && <QQCenter api={api} onApplied={refresh} onNavigate={navigate}/>}
           {page === "team" && (
             <Team
               key={u.id}
@@ -1021,14 +997,12 @@ export default function App() {
               notify={notify}
             />
           )}
-          <footer className="page-footer">
-            <span>
-              TimeSync 时聚 <i /> 让时间有序，让相聚简单。
-            </span>
-            <span>本地演示 · SQLite 持久化</span>
-          </footer>
+
         </main>
       </div>
+      <dialog ref={assistantDialog} className="assistant-drawer" aria-label="时聚AI助手" tabIndex={-1} onCancel={()=>setAssistantOpen(false)} onClose={()=>setAssistantOpen(false)}>
+        <Assistant key={token} api={api} open={assistantOpen} onClose={()=>setAssistantOpen(false)} onNavigate={(id,date)=>{if(id==="calendar"&&date)setCalendarFocus(prev=>({date,revision:(prev?.revision??0)+1}));setAssistantOpen(false);navigate(id);}} onApplied={async()=>{setPlanResult(null);setRepairResult(null);await refresh();}}/>
+      </dialog>
       {toast && (
         <div className="toast" role="status">
           <CheckCircle2 size={18} />
@@ -1072,6 +1046,7 @@ export default function App() {
             onSaved={async () => {
               await refresh();
               setTimetableOpen(false);
+              setCalendarFocus(null);
               setPage("calendar");
               notify(
                 "课表已导入，已切换到对应周。请核对本周的排程窗口与可用时段。",

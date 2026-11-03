@@ -67,7 +67,7 @@ export function saveAuth(session: AuthSession | null): void {
 
 export async function fetchAuthConfig(): Promise<AuthConfig | null> {
   try {
-    const response = await fetch("/api/auth/config");
+    const response = await fetch("/api/auth/config", {cache:"no-store"});
     return response.ok ? ((await response.json()) as AuthConfig) : null;
   } catch {
     return null;
@@ -75,7 +75,7 @@ export async function fetchAuthConfig(): Promise<AuthConfig | null> {
 }
 
 export async function fetchDemoAccounts(): Promise<Record<string, string>> {
-  const response = await fetch("/api/demo/accounts");
+  const response = await fetch("/api/demo/accounts", {cache:"no-store"});
   if (!response.ok) return {};
   const data = await response.json();
   return data?.accounts ?? {};
@@ -91,7 +91,9 @@ async function readError(response: Response): Promise<string> {
 }
 
 export async function sandboxLogin(member: string): Promise<AuthSession> {
+  if (!navigator.onLine) throw new Error("离线时不能登录，请恢复网络后重试。");
   const response = await fetch("/api/sandbox/sessions", {
+    cache: "no-store",
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ member }),

@@ -74,7 +74,7 @@ def main():
     command([node,FRONTEND/'node_modules/typescript/bin/tsc','-b'],FRONTEND)
     command([node,FRONTEND/'node_modules/vite/bin/vite.js','build'],FRONTEND)
     if args.check:
-        command([node,'--experimental-strip-types','--test','tests/calendar.test.mjs'],FRONTEND)
+        command([node,'--experimental-strip-types','--test','tests/calendar.test.mjs','tests/pwa.test.mjs','tests/requestId.test.mjs'],FRONTEND)
         command([python,'-m','pytest','-q'],BACKEND)
         print('TimeSync: backend tests, TypeScript and production build passed.')
         return

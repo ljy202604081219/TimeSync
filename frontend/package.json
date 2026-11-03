@@ -1,6 +1,25 @@
 {
-  "name": "timesync", "private": true, "version": "1.0.0", "type": "module",
-  "scripts": {"dev": "vite --host 127.0.0.1", "build": "tsc -b && vite build"},
-  "dependencies": {"react": "19.2.0", "react-dom": "19.2.0", "lucide-react": "0.468.0"},
-  "devDependencies": {"@types/react": "19.2.2", "@types/react-dom": "19.2.2", "@vitejs/plugin-react": "5.0.4", "vite": "7.1.12", "typescript": "5.9.3", "tailwindcss": "4.1.16", "@tailwindcss/vite": "4.1.16"}
+  "name": "timesync",
+  "private": true,
+  "version": "2.1.7",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "test": "node --experimental-strip-types --test tests/calendar.test.mjs tests/pwa.test.mjs tests/requestId.test.mjs tests/qqNotice.test.mjs"
+  },
+  "dependencies": {
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "lucide-react": "0.468.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.0.4",
+    "vite": "7.1.12",
+    "typescript": "5.9.3",
+    "tailwindcss": "4.1.16",
+    "@tailwindcss/vite": "4.1.16"
+  }
 }

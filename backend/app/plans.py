@@ -32,17 +32,24 @@ def snapshot(db,user):
 def serialize(row):
     return {c.name:getattr(row,c.name) for c in row.__table__.columns}
 
-def compute(db,user,extra=(),ignore_meeting=None):
+def compute(db,user,extra=(),ignore_meeting=None,placements=None):
     old=latest(db,user.id)
     before=schedule_rows(db,old)
     available,busy=constraints(db,user,extra,ignore_meeting)
-    result=solve(rows(db,Task,user.id),user.window_start,user.window_end,available,busy,{r['task_id']:r for r in before})
+    result=solve(rows(db,Task,user.id),user.window_start,user.window_end,available,busy,{r['task_id']:r for r in before},placements=placements)
+    if not available and result['status']=='infeasible' and all(c['code']=='no_contiguous_slot' for c in result.get('conflicts',[])):
+        configured=any(r.kind=='available' for r in rows(db,Availability,user.id))
+        result['availability_status']='outside_window' if configured else 'missing'
+        result['diagnostics']=[('已设置的可用时段没有覆盖当前规划窗口。' if configured else '尚未设置可排程时段，这不代表日历里没有空闲。')+'请选择允许排程的时段后重试。']
     old_by={r['task_id']:r for r in before}
     changes=[]
     for row in result['schedule']:
         prev=old_by.get(row['task_id'])
         if not prev or prev['start']!=row['start'] or prev['end']!=row['end']:
-            changes.append({'task_id':row['task_id'],'title':row['title'],'before':prev,'after':row,'reason':'新增约束或依赖使原时间不可用；按最少改动目标重新安排。' if prev else '新增任务首次安排。'})
+            reason='新增约束或依赖使原时间不可用；按最少改动目标重新安排。' if prev else '新增任务首次安排。'
+            if placements:
+                reason='按你指定的时段调整，并验证课程、DDL和任务依赖。' if row['task_id'] in placements else '为配合指定任务时段，按最少改动目标调整。'
+            changes.append({'task_id':row['task_id'],'title':row['title'],'before':prev,'after':row,'reason':reason})
     return {**result,'before':before,'changes':changes,'expected_plan_id':old.id if old else None,'expected_snapshot':snapshot(db,user)}
 
 def persist(db,user,result,reason):

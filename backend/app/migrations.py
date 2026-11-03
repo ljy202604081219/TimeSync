@@ -12,9 +12,11 @@ from sqlalchemy import inspect, text
 
 from .db import Base, schema_version
 from .models import (
+    AssistantThread, AssistantProposal,
     AiUsage, Availability, BusyInterval, DeviceToken, Disruption, Meeting,
     MeetingInvitation, PlanVersion, RequestRecord, SandboxSession, ScheduledTask,
     Task, TimetableImport, User,
+    QQGroup, QQMessage, QQNotice,
 )
 
 # The eleven tables delivered by ① before ③ touched the schema.
@@ -46,6 +48,16 @@ def baseline(connection):
 @migration(2, 'sandbox sessions, device tokens, ai budget ledger')
 def identity(connection):
     Base.metadata.create_all(bind=connection, tables=IDENTITY_TABLES)
+
+
+@migration(3, 'assistant conversations and confirmed proposals')
+def assistant_schema(connection):
+    Base.metadata.create_all(bind=connection, tables=[AssistantThread.__table__, AssistantProposal.__table__])
+
+
+@migration(4, 'authorized QQ collection, durable inbox and confirmation links')
+def qq_schema(connection):
+    Base.metadata.create_all(bind=connection,tables=[QQGroup.__table__,QQNotice.__table__,QQMessage.__table__])
 
 
 def expected_version():

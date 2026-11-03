@@ -381,23 +381,8 @@ export function RepairPanel({
                 {result.id ? `已保存版本 #${result.id}` : "预览 · 尚未写入"}
               </Badge>
             </div>
-            <div className="compare-columns">
-              <div>
-                <div className="compare-label">
-                  <i className="tiny-dot orange" />
-                  修复前
-                </div>
-                <ScheduleList items={result.before} />
-              </div>
-              <div>
-                <div className="compare-label">
-                  <i className="tiny-dot green" />
-                  修复后
-                </div>
-                <ScheduleList items={result.schedule} />
-              </div>
-            </div>
             <Changes changes={result.changes} />
+            <details className="full-plan-details"><summary>查看完整修复前后计划</summary><div className="compare-columns"><div><h3>修复前</h3><ScheduleList items={result.before}/></div><div><h3>修复后</h3><ScheduleList items={result.schedule}/></div></div></details>
             <div className="confirmation-footer">
               <p>
                 {["optimal", "feasible"].includes(result.status)
@@ -428,7 +413,7 @@ export function RepairPanel({
         <section className="card repair-placeholder">
           <span className="step-label">02</span>
           <h2>改变什么，保留什么，清楚再决定。</h2>
-          <p>预览后将并列展示原计划与新计划，以及每项任务的调整原因。</p>
+          <p>预览后将展示每项变动的原时间、新时间和调整原因。</p>
           <div className="placeholder-bars">
             <i />
             <MoveRight />

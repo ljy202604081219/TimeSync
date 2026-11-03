@@ -41,6 +41,10 @@ services:
         value: "7"
       - key: ADMIN_TOKEN
         generateValue: true
+      - key: ASSISTANT_MODE
+        value: auto
+      - key: AI_ADMIN_UI
+        value: "false"
       # MiMo：Key 只放平台 Secret
       - key: AI_PROVIDER
         value: mimo
@@ -52,20 +56,16 @@ services:
         sync: false
       # 费用与体积保护
       - key: AI_BUDGET_ENABLED
-        value: "true"
-      - key: AI_DAILY_BUDGET
-        value: "20"
-      - key: AI_ACTOR_DAILY_BUDGET
-        value: "5"
+        value: "false"
       - key: AI_MAX_CONCURRENCY
         value: "1"
       - key: MAX_REQUEST_BYTES
         value: "8388608"
       - key: AUTO_MIGRATE
         value: "true"
-      # 空库首次启动时创建 A/B/C/D 合成身份与当周演示数据（非空库不写入）
+      # 空库只创建A/B/C/D登录身份，不自动生成示例课表或任务
       - key: BOOTSTRAP_FIXTURES
-        value: "true"
+        value: "false"
       - key: WEB_CONCURRENCY
         value: "1"
       - key: TZ

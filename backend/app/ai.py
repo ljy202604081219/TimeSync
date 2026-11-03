@@ -3,12 +3,28 @@ import os
 import re
 import json
 import base64
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import Literal
 import httpx
 from pydantic import BaseModel,Field,field_validator,model_validator
 from .timeutil import iso
 from urllib.parse import urlsplit
 from .ai_config import explain
+
+_session_client=ContextVar('timesync_ai_client',default=None)
+_session_model=ContextVar('timesync_ai_model',default=None)
+
+
+@asynccontextmanager
+async def model_session(model=None):
+    """Reuse one connection within a turn; never share clients across event loops."""
+    async with httpx.AsyncClient(timeout=60) as client:
+        client_token=_session_client.set(client)
+        model_token=_session_model.set(model or None)
+        try:yield
+        finally:
+            _session_model.reset(model_token);_session_client.reset(client_token)
 
 class Extraction(BaseModel):
     model_config={'extra':'forbid'}
@@ -50,7 +66,7 @@ async def call_model(system,content):
     key=os.getenv('AI_API_KEY')
     if not key: raise ValueError('未配置模型 Key')
     base=os.getenv('AI_BASE_URL','https://api.openai.com/v1').rstrip('/')
-    model=os.getenv('AI_MODEL','gpt-4.1-mini')
+    model=_session_model.get() or os.getenv('AI_MODEL','gpt-4.1-mini')
     parsed=urlsplit(base)
     if parsed.scheme!='https' and not (parsed.scheme=='http' and parsed.hostname in ('localhost','127.0.0.1','::1')):
         raise ValueError('AI_BASE_URL 必须使用 HTTPS 或本地开发地址')
@@ -58,12 +74,16 @@ async def call_model(system,content):
     payload={'model':model,'messages':[{'role':'system','content':system},{'role':'user','content':content}],'response_format':{'type':'json_object'},'max_completion_tokens':4096}
     if is_mimo: payload['thinking']={'type':'disabled'}
     else: payload['temperature']=0
-    async with httpx.AsyncClient(timeout=60) as client:
+    client=_session_client.get()
+    if client is not None:
         response=await client.post(base+'/chat/completions',headers={'api-key':key} if is_mimo else {'Authorization':f'Bearer {key}'},json=payload)
-        response.raise_for_status()
-        choice=response.json()['choices'][0]
-        if choice.get('finish_reason') in ('length','content_filter'): raise ValueError('模型输出不完整')
-        return json.loads(choice['message']['content'])
+    else:
+        async with httpx.AsyncClient(timeout=60) as client:
+            response=await client.post(base+'/chat/completions',headers={'api-key':key} if is_mimo else {'Authorization':f'Bearer {key}'},json=payload)
+    response.raise_for_status()
+    choice=response.json()['choices'][0]
+    if choice.get('finish_reason') in ('length','content_filter'): raise ValueError('模型输出不完整')
+    return json.loads(choice['message']['content'])
 
 async def extract(text,image_bytes=None,mime=None):
     if not os.getenv('AI_API_KEY'):

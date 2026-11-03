@@ -12,6 +12,7 @@ def config(tmp_path,monkeypatch):
     for name in ('AI_API_KEY','AI_MODEL','AI_BASE_URL','AI_PROVIDER'): monkeypatch.delenv(name,raising=False)
     # Register restoration before save() changes process configuration.
     for name,value in {'AI_API_KEY':'','AI_MODEL':'mimo-v2.6-pro','AI_BASE_URL':ai_config.BASE,'AI_PROVIDER':'mimo'}.items(): monkeypatch.setenv(name,value)
+    monkeypatch.setenv('ASSISTANT_MODE','mock')
     return target
 
 def client_mock(monkeypatch,status=200,content='{"ok":true}',capture=None):
@@ -31,6 +32,10 @@ def test_save_test_secret_not_returned(system,config,monkeypatch):
     assert 'private-test-credential' not in result.text
     assert 'private-test-credential' in config.read_text()
     assert call('GET','/api/ai/settings').json()['has_key']
+    assert result.json()['assistant_mode']=='auto'
+    assert "ASSISTANT_MODE='auto'" in config.read_text()
+    from app import assistant
+    assert isinstance(assistant.provider(),assistant.CompatibleProvider)
     assert 'private-test-credential' not in call('GET','/api/ai/settings').text
     assert call('POST','/api/ai/demo').json()['mode']=='demo'
     assert 'private-test-credential' not in config.read_text()

@@ -12,7 +12,7 @@ def failure(status,code,message,task_ids=(),**details):
     return {'status':status,'diagnostics':[message],'conflicts':[{'code':code,'task_ids':list(task_ids),**details}],'schedule':[]}
 
 
-def solve(tasks, start, end, available, busy=(), previous=None, time_limit=3):
+def solve(tasks, start, end, available, busy=(), previous=None, time_limit=3, placements=None):
     start,end=dt(start),dt(end)
     previous=previous or {}
     horizon=floor((end-start).total_seconds()/900)
@@ -46,7 +46,11 @@ def solve(tasks, start, end, available, busy=(), previous=None, time_limit=3):
         duration=ceil(task.duration_minutes/SLOT)
         latest=floor((dt(task.deadline)-start).total_seconds()/900)-duration
         ranges=[]
-        for a,b in free:
+        task_free=free
+        if placements and task.id in placements:
+            from .intervals import intersect
+            task_free=intersect(free,[tuple(map(dt,placements[task.id]))])
+        for a,b in task_free:
             lo=max(0,ceil((a-start).total_seconds()/900))
             hi=min(horizon-duration,latest,floor((b-start).total_seconds()/900)-duration)
             if lo<=hi: ranges.append((lo,hi))
@@ -125,10 +129,10 @@ def solve(tasks, start, end, available, busy=(), previous=None, time_limit=3):
         stages.append({'goal':label,'value':value,'optimal':status==cp_model.OPTIMAL})
         if status!=cp_model.OPTIMAL: break  # Never degrade an unproven higher-priority objective.
         model.add(objective==value)
-    verify(tasks,best or [],start,end,available,busy)
+    verify(tasks,best or [],start,end,available,busy,placements)
     return {'status':'optimal' if len(stages)==4 and all(s['optimal'] for s in stages) else 'feasible','schedule':best or [],'diagnostics':[],'conflicts':[],'objectives':stages}
 
-def verify(tasks,schedule,start,end,available,busy):
+def verify(tasks,schedule,start,end,available,busy,placements=None):
     """Independent post-solve guard; a bad schedule is never persisted."""
     assert len(schedule)==len(tasks)
     by_id={r['task_id']:r for r in schedule}
@@ -139,6 +143,9 @@ def verify(tasks,schedule,start,end,available,busy):
         assert dt(start)<=a<b<=min(dt(end),dt(task.deadline))
         assert (b-a).total_seconds()==ceil(task.duration_minutes/15)*900
         assert any(c<=a and b<=d for c,d in free)
+        if placements and task.id in placements:
+            lo,hi=map(dt,placements[task.id])
+            assert lo<=a<b<=hi
         assert all(dt(by_id[dep]['end'])<=a for dep in task.dependencies)
     for i,row in enumerate(schedule):
         assert all(not overlap(dt(row['start']),dt(row['end']),dt(other['start']),dt(other['end'])) for other in schedule[i+1:])

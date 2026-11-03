@@ -10,6 +10,13 @@ from app.demo import seed
 from app.main import app
 
 
+@pytest.fixture(autouse=True)
+def legacy_assistant_confirmation(monkeypatch):
+    # Keep legacy confirmation contracts under test; auto-create tests explicitly
+    # remove this override to exercise the production default.
+    monkeypatch.setenv('ASSISTANT_AUTO_CREATE','false')
+
+
 def database_url(tmp_path):
     """PostgreSQL when TIMESYNC_TEST_DATABASE_URL is set, SQLite otherwise.
 

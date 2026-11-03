@@ -59,3 +59,9 @@ export function layoutEvents<T extends {start:string;end:string}>(events:T[]) {
   }
   flush();return result;
 }
+
+export function weekStart(value:string):string {
+  const day=value.slice(0,10);
+  const weekday=(new Date(day+"T12:00:00Z").getUTCDay()+6)%7;
+  return addDays(day,-weekday);
+}

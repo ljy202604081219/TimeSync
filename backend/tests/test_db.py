@@ -152,13 +152,13 @@ def test_migrations_apply_once_and_are_idempotent(tmp_path):
     engine = make_engine('sqlite:///' + str(tmp_path / 'migrate.db'))
     try:
         first = ensure_schema(engine)
-        assert first['applied_now'] == [1, 2]
+        assert first['applied_now'] == list(range(1, expected_version()+1))
         assert first['schema_version'] == expected_version()
         second = ensure_schema(engine)
         assert second['applied_now'] == [] and second['pending'] == []
         with engine.connect() as conn:
             versions = conn.execute(text('SELECT version FROM schema_migrations ORDER BY version')).scalars().all()
-            assert versions == [1, 2]
+            assert versions == list(range(1, expected_version()+1))
     finally:
         engine.dispose()
 
@@ -179,7 +179,7 @@ def test_migrations_upgrade_an_existing_database_without_data_loss(tmp_path):
         assert 'sandbox_sessions' not in inspect(engine).get_table_names()
 
         report = ensure_schema(engine)
-        assert report['applied_now'] == [1, 2]
+        assert report['applied_now'] == list(range(1, expected_version()+1))
         tables = set(inspect(engine).get_table_names())
         assert {'sandbox_sessions', 'device_tokens', 'ai_usage', 'schema_migrations'} <= tables
         with factory() as session:

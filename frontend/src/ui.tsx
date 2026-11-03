@@ -168,6 +168,7 @@ export function Legend() {
     <div className="legend">
       {[
         ["course", "固定课程"],
+        ["unavailable", "个人日程"],
         ["task", "个人任务"],
         ["ddl", "截止时间"],
         ["meeting", "会议"],
@@ -228,7 +229,7 @@ export function SolveResult({ result }: { result: Data }) {
         </div>
       </div>
       {result.objectives && (
-        <div className="objectives">
+        <details className="solver-details"><summary>查看求解详情</summary><div className="objectives">
           {result.objectives.map((o: Data, i: number) => (
             <span key={o.goal}>
               {["改动任务", "移动格数", "零碎空档", "优先级目标"][i]}{" "}
@@ -236,46 +237,13 @@ export function SolveResult({ result }: { result: Data }) {
               {!o.optimal && "（未证最优）"}
             </span>
           ))}
-        </div>
+        </div></details>
       )}
     </div>
   );
 }
 export function Changes({ changes }: { changes: Data[] }) {
-  return changes.length ? (
-    <div className="table-scroll">
-      <table className="change-table">
-        <thead>
-          <tr>
-            <th>变化任务</th>
-            <th>原计划</th>
-            <th />
-            <th>新计划</th>
-            <th>原因</th>
-          </tr>
-        </thead>
-        <tbody>
-          {changes.map((c) => (
-            <tr key={c.task_id}>
-              <td>
-                <b>{c.title}</b>
-              </td>
-              <td className="old-time">
-                {c.before ? range(c.before.start, c.before.end) : "尚未安排"}
-              </td>
-              <td>
-                <MoveRight size={16} />
-              </td>
-              <td className="new-time">{range(c.after.start, c.after.end)}</td>
-              <td>
-                <small>{c.reason}</small>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  ) : (
-    <Empty text="原计划已符合新增约束，无需移动。" />
-  );
+  return changes.length ? <div className="plan-change-list">{changes.map(c=><article className="plan-change" key={c.task_id}>
+    <h3>{c.title}</h3><div className="plan-change-times"><div><small>原时间</small><span>{c.before?range(c.before.start,c.before.end):"尚未安排"}</span></div><MoveRight size={18}/><div><small>新时间</small><strong>{range(c.after.start,c.after.end)}</strong></div></div><p>{c.reason}</p>
+  </article>)}</div> : <p className="no-plan-changes">本次没有需要移动的任务。</p>;
 }

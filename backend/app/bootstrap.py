@@ -53,7 +53,7 @@ def ensure_identities(db):
     return [f'{member}:{MEMBERS[member]}' for member in 'ABCD']
 
 
-def initialise_if_empty(anchor=None, with_fixtures=True):
+def initialise_if_empty(anchor=None, with_fixtures=False):
     """First-boot initialisation for a fresh cloud database.
 
     Idempotent by construction: it only acts when there are no users at all, so

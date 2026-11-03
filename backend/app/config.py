@@ -36,6 +36,11 @@ def demo_mode():
     return flag('DEMO_MODE', True)
 
 
+def ai_admin_ui():
+    """Opt-in workstation maintenance, never part of the user onboarding."""
+    return flag('AI_ADMIN_UI', False)
+
+
 def sandbox_enabled():
     """Short-lived shared browser sessions for the competition sandbox."""
     return flag('SANDBOX_MODE', False)
@@ -86,7 +91,7 @@ def max_request_bytes():
 
 
 def ai_budget_enabled():
-    return flag('AI_BUDGET_ENABLED', True)
+    return flag('AI_BUDGET_ENABLED', False)
 
 
 def ai_daily_budget():

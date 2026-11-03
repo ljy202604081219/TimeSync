@@ -14,7 +14,7 @@ class TaskInput(Strict):
     dependencies: list[int] = Field(default_factory=list,max_length=60)
     requirements: str = Field(default='',max_length=4000)
     evidence: str = Field(default='',max_length=8000)
-    source: Literal['manual','demo','ai']='manual'
+    source: Literal['manual','demo','ai','qq']='manual'
     @field_validator('deadline')
     @classmethod
     def time(cls,v): return iso(v)
@@ -35,6 +35,9 @@ class RangeInput(Strict):
         if dt(self.start)>=dt(self.end): raise ValueError('结束时间必须晚于开始时间')
         if (dt(self.end)-dt(self.start)).total_seconds()>14*86400: raise ValueError('范围不得超过 14 天')
         return self
+
+class AvailableSlots(Strict):
+    slots: list[RangeInput]=Field(min_length=1,max_length=10)
 
 class BusyInput(RangeInput):
     title: str = Field(min_length=1,max_length=160)

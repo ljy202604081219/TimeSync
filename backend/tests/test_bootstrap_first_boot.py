@@ -24,7 +24,7 @@ def factory(tmp_path):
 
 def test_empty_database_gets_identities_and_fixtures(factory, monkeypatch):
     monkeypatch.setattr(bootstrap, 'SessionLocal', factory)
-    summary = bootstrap.initialise_if_empty(anchor='2026-11-02')
+    summary = bootstrap.initialise_if_empty(anchor='2026-11-02',with_fixtures=True)
 
     assert sorted(summary['created_identities']) == ['A:林同学', 'B:陈同学', 'C:王同学', 'D:许同学']
     assert sorted(summary['fixtures_members']) == ['A', 'B', 'C', 'D']
@@ -40,7 +40,7 @@ def test_empty_database_gets_identities_and_fixtures(factory, monkeypatch):
 
 def test_second_boot_changes_nothing(factory, monkeypatch):
     monkeypatch.setattr(bootstrap, 'SessionLocal', factory)
-    bootstrap.initialise_if_empty(anchor='2026-11-02')
+    bootstrap.initialise_if_empty(anchor='2026-11-02',with_fixtures=True)
     with factory() as db:
         before = (db.scalar(select(func.count()).select_from(User)),
                   db.scalar(select(func.count()).select_from(Task)))
@@ -69,3 +69,26 @@ def test_bootstrap_is_off_by_default(monkeypatch):
     monkeypatch.setenv('BOOTSTRAP_FIXTURES', 'true')
     assert config.bootstrap_fixtures() is True
     assert config.bootstrap_anchor() == ''
+
+
+def test_default_bootstrap_has_identities_only(factory,monkeypatch):
+    monkeypatch.setattr(bootstrap,'SessionLocal',factory)
+    result=bootstrap.initialise_if_empty()
+    assert result['counts']['users']==4 and result['counts']['tasks']==0
+    from app.models import BusyInterval,Availability,PlanVersion
+    with factory() as db:
+        for cls in (BusyInterval,Availability,PlanVersion):
+            assert db.scalar(select(func.count()).select_from(cls))==0
+
+
+def test_sandbox_lifespan_creates_login_members_without_schedule(factory,monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    monkeypatch.setattr(bootstrap,'SessionLocal',factory)
+    monkeypatch.setenv('AUTO_MIGRATE','false');monkeypatch.setenv('DEMO_MODE','false')
+    monkeypatch.setenv('SANDBOX_MODE','true');monkeypatch.setenv('BOOTSTRAP_FIXTURES','false')
+    for _ in range(2):
+        with TestClient(app) as client:assert client.get('/api/health').status_code==200
+    with factory() as db:
+        assert db.scalar(select(func.count()).select_from(User))==4
+        assert db.scalar(select(func.count()).select_from(Task))==0

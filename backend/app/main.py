@@ -1,4 +1,7 @@
+from datetime import timedelta
 from contextlib import asynccontextmanager
+from contextlib import suppress
+import asyncio
 from pathlib import Path
 import os
 import json
@@ -18,9 +21,9 @@ from .db import (engine, session, SessionLocal, backend_of, describe, schema_ver
                  BusinessLockTimeout)
 from .middleware import BodySizeLimit
 from .models import User,Task,BusyInterval,Availability,PlanVersion,Disruption,RequestRecord
-from .schemas import TaskInput,BusyInput,AvailabilityInput,RangeInput,DisruptionInput
+from .schemas import TaskInput,BusyInput,AvailabilityInput,RangeInput,DisruptionInput,AvailableSlots
 from .plans import rows,latest,schedule_rows,compute,persist,serialize,valid_current,snapshot
-from .timeutil import dt,expand
+from .timeutil import dt,expand,now
 from .demo import seed
 from .schemas import CandidateInput,MeetingInput,ResponseInput,DeviceIssueInput,SandboxLoginInput
 from .models import Meeting,MeetingInvitation
@@ -44,11 +47,11 @@ async def lifespan(app):
     # Versioned, additive migrations only. Never drop_all() or reset data.
     if config.auto_migrate():
         migrations.ensure_schema(engine)
-    if config.bootstrap_fixtures():
+    if config.sandbox_enabled() or config.bootstrap_fixtures():
         # Cloud first boot: an empty database would answer /api/auth/config with
         # zero members and nobody could log in. Idempotent - only acts when the
         # user table is empty, so restarts and redeploys change nothing.
-        summary = bootstrap.initialise_if_empty(anchor=config.bootstrap_anchor() or None)
+        summary = bootstrap.initialise_if_empty(anchor=config.bootstrap_anchor() or None,with_fixtures=config.bootstrap_fixtures())
         if summary['created_identities']:
             print(f"TimeSync: bootstrapped {len(summary['created_identities'])} synthetic identities "
                   f"and fixtures for {len(summary['fixtures_members'])} members.")
@@ -62,7 +65,18 @@ async def lifespan(app):
                 # sandbox sessions or administrator-issued device credentials.
                 print('TimeSync: demo identities created. No token file is written on a '
                       'server database; use /api/sandbox/sessions or app.bootstrap.')
-    yield
+    from .integrations.qq.service import worker,enabled
+    from .integrations.qq import replies
+    stop=asyncio.Event()
+    background=asyncio.create_task(worker(stop)) if enabled('QQ_PROCESSOR_ENABLED','true') else None
+    reply_background=asyncio.create_task(replies.worker(stop)) if enabled('QQ_REPLY_ENABLED') else None
+    try:yield
+    finally:
+        stop.set()
+        for task in (background,reply_background):
+            if task:
+                task.cancel()
+                with suppress(asyncio.CancelledError):await task
 
 app = FastAPI(title='TimeSync 时聚', lifespan=lifespan)
 app.add_middleware(BodySizeLimit)
@@ -166,6 +180,7 @@ def me(found:authn.Principal=Depends(principal)):
     user=found.user
     return {'id':user.id,'name':user.name,'window_start':user.window_start,'window_end':user.window_end,
             'demo':config.demo_mode(),'ai_mode':'live' if os.getenv('AI_API_KEY') else 'demo',
+            'ai_configuration_allowed':config.ai_admin_ui() and config.demo_mode() and found.kind=='user' and user.id=='A',
             'credential':found.kind,'scope':sorted(found.scope),'expires_at':found.expires_at}
 
 
@@ -289,6 +304,36 @@ def add_available(data:AvailabilityInput,key:str=Header(default='',alias='Idempo
         item=Availability(owner_id=user.id,**data.model_dump());db.add(item);db.flush();return serialize(item)
     return mutation(db,user,key,'availability',data.model_dump(),action)
 
+@app.get('/api/availability/suggestions')
+def free_time(response:Response,user=Depends(auth),db=Depends(session)):
+    from .assistant import collect,Understanding
+    from .intervals import intersect,ceil_slot
+    response.headers['Cache-Control']='no-store'
+    current=dt(now());day=current.replace(hour=0,minute=0,second=0,microsecond=0)
+    facts=collect(db,user,Understanding(intent='free',date=day.isoformat()))
+    raw=[(dt(s['start']),dt(s['end'])) for s in facts['observed_gaps']]
+    upcoming=intersect(raw,[(ceil_slot(current),day+timedelta(days=1))])
+    eligible=intersect(upcoming,[(dt(user.window_start),dt(user.window_end))])
+    configured=db.scalar(select(Availability.id).where(Availability.owner_id==user.id,Availability.kind=='available')) is not None
+    return {'day':day.isoformat(),'configuration_status':'configured' if configured else 'missing',
+        'calendar_gaps':[{'start':a.isoformat(),'end':b.isoformat(),'minutes':int((b-a).total_seconds()/60)} for a,b in upcoming],
+        'eligible_slots':[{'start':a.isoformat(),'end':b.isoformat(),'minutes':int((b-a).total_seconds()/60)} for a,b in eligible if b-a>=timedelta(minutes=15)],
+        'notice':'这是按已记录日程计算的参考空档；尚未配置不代表没有空闲，选中并允许后才用于排程。'}
+
+@app.post('/api/availability/apply-suggestions')
+def apply_free_time(data:AvailableSlots,user=Depends(auth),db=Depends(session),key:str=Header(default='',alias='Idempotency-Key')):
+    def action():
+        from .plans import compute,persist,rows
+        existing=rows(db,Availability,user.id);added=0
+        for slot in data.slots:
+            if dt(slot.start)<dt(user.window_start) or dt(slot.end)>dt(user.window_end):raise HTTPException(422,'所选时段超出当前规划窗口，请先调整规划日期')
+            if not any(r.kind=='available' and r.weekday is None and r.start==slot.start and r.end==slot.end for r in existing):
+                row=Availability(owner_id=user.id,kind='available',start=slot.start,end=slot.end);db.add(row);existing.append(row);added+=1
+        db.flush();result=compute(db,user)
+        saved=persist(db,user,result,'本人确认参考空档为可排程时段') if result['status'] in ('optimal','feasible') else None
+        return {'availability_added':added,'plan':saved,'scheduling':result,'notice':'所选时段已允许排程，计划已更新。' if saved else '可排程时段已保存；当前任务仍有约束冲突，请查看诊断。'}
+    return mutation(db,user,key,'free-time:apply',data.model_dump(),action)
+
 @app.delete('/api/constraints/{kind}/{item_id}')
 def delete_constraint(kind:str,item_id:int,key:str=Header(default='',alias='Idempotency-Key'),user:User=Depends(auth),db:Session=Depends(session)):
     def action():
@@ -361,6 +406,8 @@ async def extract_notice(text:str=Form(default='',max_length=12000),image:Upload
     reservation=reserve_model_call(db,found,'extract')
     try:
         result=await ai.extract(text,raw,mime)
+    except asyncio.CancelledError:
+        ai_budget.settle(db,reservation,'cancelled');raise
     except HTTPException:
         ai_budget.settle(db,reservation,'error','http')
         raise
@@ -377,6 +424,8 @@ async def extract_courses(image:UploadFile=File(),notes:str=Form(default='',max_
     reservation=reserve_model_call(db,found,'timetable')
     try:
         result=await timetable.extract_timetable(raw,mime,notes,use_school_schedule)
+    except asyncio.CancelledError:
+        ai_budget.settle(db,reservation,'cancelled');raise
     except HTTPException:
         ai_budget.settle(db,reservation,'error','http')
         raise
@@ -470,7 +519,56 @@ def ai_use_demo(user:User=Depends(local_ai_admin)):
     ai_config.save({'AI_API_KEY':''})
     return ai_config.status()
 
+# Assistant routes are additive; agenda/device schemas remain unchanged.
+from . import assistant
+from .models import AssistantThread
+
+@app.get('/api/v1/assistant/status')
+def assistant_status(response:Response,user:User=Depends(auth),db:Session=Depends(session)):
+    response.headers['Cache-Control']='no-store'
+    live=isinstance(assistant.provider(),assistant.CompatibleProvider)
+    budget=ai_budget.status(db,'assistant:'+user.id)
+    return {'mode':'live' if live else 'mock','configured':bool(os.getenv('AI_API_KEY')),
+            'model':os.getenv('ASSISTANT_MODEL','').strip() or os.getenv('AI_MODEL','gpt-4.1-mini'),
+            'read_strategy':'single_pass_when_grounded',
+            'auto_create':config.flag('ASSISTANT_AUTO_CREATE',True),
+            'direct_add':config.flag('ASSISTANT_AUTO_CREATE',True),
+            'requires_user_key':False,'managed_by':'project',
+            'label':'项目 AI 服务已配置' if live else '规则演示 · 非真实大模型',
+            'notice':'项目统一提供 AI 服务，无需填写个人 API Key。' if live else '项目 AI 服务尚未启用，当前为规则演示；请联系项目维护者。',
+            'budget_enabled':budget['enabled'],'remaining':budget['actor']['remaining'],
+            'shared_remaining':budget['global']['remaining']}
+
+@app.post('/api/v1/assistant/chat')
+async def assistant_chat(data:assistant.ChatInput,response:Response,user:User=Depends(auth),db:Session=Depends(session),idempotency_key:Annotated[str|None,Header()]=None):
+    response.headers['Cache-Control']='no-store'
+    if not data.request_id and idempotency_key:
+        if len(idempotency_key)>120:raise HTTPException(400,'Idempotency-Key不能超过120字符')
+        data=data.model_copy(update={'request_id':idempotency_key})
+    return await assistant.chat(db,user,data)
+
+@app.get('/api/v1/assistant/conversations/latest')
+def assistant_history(response:Response,user:User=Depends(auth),db:Session=Depends(session)):
+    response.headers['Cache-Control']='no-store'
+    row=db.scalar(select(AssistantThread).where(AssistantThread.owner_id==user.id).order_by(AssistantThread.updated_at.desc(),AssistantThread.id.desc()))
+    return {'conversation_id':row.id if row else None,'messages':row.messages if row else []}
+
+@app.delete('/api/v1/assistant/conversations/{ident}')
+def assistant_clear(ident:str,user:User=Depends(auth),db:Session=Depends(session)):
+    with write_transaction(db,'assistant:'+user.id):
+        row=assistant.get_thread(db,user,ident)
+        db.delete(row)
+        db.execute(assistant.delete(assistant.AssistantProposal).where(assistant.AssistantProposal.owner_id==user.id))
+        db.commit()
+    return {'cleared':True}
+
+@app.post('/api/v1/assistant/proposals/{ident}/confirm')
+def assistant_confirm(ident:str,data:assistant.ConfirmInput,key:str=Header(default='',alias='Idempotency-Key'),user:User=Depends(auth),db:Session=Depends(session)):
+    return mutation(db,user,key,'assistant:confirm:'+ident,data.model_dump(),lambda:assistant.apply_proposal(db,user,ident))
+
 # Production launcher builds first, then serves UI and API from one origin.
+from .integrations.qq.routes import router as qq_router
+app.include_router(qq_router)
 DIST=Path(__file__).resolve().parents[2]/'frontend'/'dist'
 if DIST.exists():
     app.mount('/',StaticFiles(directory=str(DIST),html=True),name='frontend')

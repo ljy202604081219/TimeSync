@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {addDays,calendarBusy,calendarStart,layoutEvents} from '../src/calendarData.ts';
+import {addDays,calendarBusy,calendarStart,layoutEvents,weekStart} from '../src/calendarData.ts';
 const oldWindow='2026-11-02T08:00:00+08:00';
 test('calendar opens the imported week independently of the planning window',()=>{
  const imports=[{id:1,week_start:'2026-12-07',course_count:12}];
@@ -21,4 +21,9 @@ test('date navigation stays correct across month/year boundaries',()=>{
 test('overlapping imported and existing courses remain side by side',()=>{
  const rows=layoutEvents([{start:'2026-12-07T08:00:00+08:00',end:'2026-12-07T10:00:00+08:00'}, {start:'2026-12-07T08:00:00+08:00',end:'2026-12-07T08:45:00+08:00'}, {start:'2026-12-07T10:00:00+08:00',end:'2026-12-07T11:00:00+08:00'}]);
  assert.equal(rows[0].lanes,2);assert.notEqual(rows[0].lane,rows[1].lane);assert.equal(rows[2].lanes,1);
+});
+
+test("assistant event focus picks its own week across imported weeks and year boundary",()=>{
+ assert.equal(weekStart("2026-11-04T09:00:00+08:00"),"2026-11-02");
+ assert.equal(weekStart("2027-01-01T14:00:00+08:00"),"2026-12-28");
 });

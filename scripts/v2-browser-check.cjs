@@ -1,0 +1,53 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const path=require('node:path');
+if(process.env.TIMESYNC_ALLOW_SYNTHETIC_WRITES!=='1')throw Error('Requires an isolated mock server with synthetic data on port 8002.');
+const out=path.join(__dirname,'../docs/v2/unified-browser-rerun');fs.mkdirSync(out,{recursive:true});
+(async()=>{
+ const browser=await chromium.launch({headless:true,channel:'chrome'});
+ const context=await browser.newContext({viewport:{width:1440,height:960}}),page=await context.newPage(),checks=[],errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:8002/');await page.getByRole('button',{name:/成员 A/}).click();await page.getByRole('heading',{name:'把时间，留给重要的事。'}).waitFor();
+ const nav=page.getByRole('navigation',{name:'主导航'});
+ assert.equal(await nav.getByRole('button').count(),6);
+ await nav.getByRole('button',{name:'计划工作台'}).click();await page.getByRole('tab',{name:'生成计划'}).waitFor();
+ await page.getByRole('button',{name:'生成并采用计划'}).click();await page.getByRole('heading',{name:/找到满足全部硬约束的计划/}).waitFor();checks.push('single plan workspace with generation and version history');
+ await page.getByRole('tab',{name:'突发事件与修复'}).click();
+ await page.getByLabel('事件名称').fill('测试临时实验');await page.getByLabel('开始时间',{exact:true}).fill('2026-11-04T14:00');await page.getByLabel('结束时间',{exact:true}).fill('2026-11-04T16:00');
+ await page.getByRole('button',{name:'预览修复方案'}).click();await page.getByRole('heading',{name:/修复前后对比/}).waitFor();
+ assert.ok(await page.locator('.plan-change').count()>0);
+ assert.equal(await page.locator('.compare-columns:visible').count(),0);
+ await page.screenshot({path:out+'/plan-workspace-desktop.png',fullPage:true});checks.push('repair uses one before/new/reason view; full plans collapsed');
+ await page.getByRole('button',{name:'打开AI助手'}).click();
+ const dialog=page.getByRole('dialog',{name:'时聚AI助手'});await dialog.waitFor();await dialog.locator('.assistant-service').filter({hasText:'规则演示'}).waitFor();
+ const input=page.getByLabel('向时聚提问');await input.fill('未发送的草稿');await page.getByRole('button',{name:'关闭AI助手'}).click();await dialog.waitFor({state:'hidden'});
+ assert.equal(await page.getByRole('tab',{name:'突发事件与修复'}).getAttribute('aria-selected'),'true');
+ await page.getByRole('button',{name:'打开AI助手'}).click();assert.equal(await input.inputValue(),'未发送的草稿');checks.push('contextual assistant preserves base page and unsent draft');
+ if(await dialog.locator('.chat-message').count()){page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'清空对话'}).click();await dialog.locator('.chat-message').first().waitFor({state:'hidden'});}
+ async function ask(q){await input.fill(q);await page.getByRole('button',{name:'发送问题'}).click();await dialog.locator('.assistant-thinking').waitFor({state:'hidden'});assert.equal(await dialog.locator('.assistant-error:visible').count(),0);}
+ await ask('2026-11-02有什么安排？');assert.ok((await dialog.locator('.chat-message.assistant').last().textContent()).includes('高等数学'));
+ await ask('2026-11-03什么时候有空？');await ask('那我可以安排两个小时吗？');await ask('如果安排到晚上呢？');
+ assert.ok((await dialog.locator('.chat-message.assistant').last().textContent()).includes('120 分钟'));checks.push('owner data and three-turn follow-up work inside drawer');
+ await ask('把《机器学习 · 实验报告》移到2026-11-03 18:00');await page.getByRole('button',{name:'确认执行并保存计划'}).waitFor();
+ assert.equal(await dialog.locator('.assistant-proposal .plan-change').count(),1);
+ await page.screenshot({path:out+'/assistant-drawer-desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(250);
+ assert.equal(await dialog.evaluate(e=>Math.round(e.getBoundingClientRect().width)),390);
+ assert.ok(await input.isVisible());assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+ await page.screenshot({path:out+'/assistant-drawer-mobile.png'});checks.push('full-height mobile assistant and compact change view; no overflow');
+ await page.getByRole('button',{name:'确认执行并保存计划'}).click();await page.getByRole('button',{name:'查看日历',exact:true}).waitFor();
+ await page.getByRole('button',{name:'查看日历',exact:true}).click();await dialog.waitFor({state:'hidden'});
+ await page.locator('.calendar-event').filter({hasText:'机器学习'}).first().waitFor();checks.push('explicit confirmation updates shared calendar and returns from drawer');
+ await page.screenshot({path:out+'/calendar-mobile.png',fullPage:true});
+ const bottom=page.getByRole('navigation',{name:'手机底部导航'});assert.equal(await bottom.getByRole('button').count(),6);
+ for(const name of ['DDL 管理','计划工作台','多人协调','个人日历']){await bottom.getByRole('button',{name}).click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);}
+ checks.push('six mobile entries keep tasks/plans/team accessible without extra pages');
+ await bottom.getByRole('button',{name:'AI 助手'}).click();await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});checks.push('native drawer supports Escape and returns focus');
+ await page.getByRole('button',{name:'打开导航',exact:true}).click();await page.getByRole('button',{name:'退出登录',exact:true}).click();await page.getByRole('button',{name:/成员 B/}).click();
+ await bottom.getByRole('button',{name:'AI 助手'}).click();await dialog.locator('.assistant-welcome').waitFor();assert.equal(await dialog.locator('.chat-message').count(),0);checks.push('account switch does not retain another identity history or draft');
+ await page.getByRole('button',{name:'关闭AI助手'}).click();await page.evaluate(async()=>{await navigator.serviceWorker.ready;});
+ await page.reload();await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+ const cached=await page.evaluate(async()=>{const result=[];for(const k of await caches.keys())for(const r of await(await caches.open(k)).keys())result.push(new URL(r.url).pathname);return result;});assert.ok(cached.every(x=>!x.startsWith('/api/')));
+ await context.setOffline(true);await page.reload();await page.getByText('当前离线 · 仅可打开应用外壳，不能读取或提交日程。',{exact:true}).waitFor();await context.setOffline(false);await page.getByRole('heading',{name:'把时间，留给重要的事。'}).waitFor();checks.push('PWA still caches only shell, offline reload and recovery work');
+ await browser.close();assert.deepEqual(errors,[]);fs.writeFileSync(out+'/results.json',JSON.stringify({checks,errors,cached,real_model_calls:0,host:'isolated source and SQLite at 8002',physical_phone:false},null,2));console.log(JSON.stringify({checks,errors}));
+})().catch(e=>{console.error(e);process.exit(1)});

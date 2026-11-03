@@ -33,6 +33,7 @@ def mock_model(monkeypatch, status=200, content=None):
 
 @pytest.fixture
 def live_ai(monkeypatch):
+    monkeypatch.setenv('AI_BUDGET_ENABLED','true')  # legacy opt-in limits remain testable
     monkeypatch.setenv('AI_API_KEY', 'budget-test-key')
     mock_model(monkeypatch)
     return monkeypatch
@@ -145,3 +146,80 @@ def test_oversized_body_rejected_even_without_token(system, monkeypatch):
     monkeypatch.setenv('MAX_REQUEST_BYTES', str(64 * 1024))
     response = client.post('/api/extract', content='x' * (70 * 1024))
     assert response.status_code == 413
+
+
+def test_no_default_daily_limit_beyond_old_demo_caps(system,live_ai):
+    call,factory,_=system
+    live_ai.delenv('AI_BUDGET_ENABLED',raising=False)
+    for _ in range(24):
+        response=call('POST','/api/extract',data={'text':TEXT})
+        assert response.status_code==200,response.text
+    data=call('GET','/api/ai/quota').json()
+    assert data['enabled'] is False
+    assert data['global']['limit'] is None and data['actor']['remaining'] is None
+    assert usage_rows(factory)==24
+
+
+def test_disabling_daily_limits_keeps_inflight_tracking(system,live_ai):
+    call,factory,_=system
+    live_ai.setenv('AI_BUDGET_ENABLED','false')
+    with factory() as db:reservation=ai_budget.reserve(db,'assistant:A','assistant')
+    response=call('POST','/api/extract',data={'text':TEXT})
+    assert response.status_code==429 and '正在处理' in response.text
+    with factory() as db:ai_budget.settle(db,reservation,'ok')
+    assert call('POST','/api/extract',data={'text':TEXT}).status_code==200
+
+
+@pytest.mark.parametrize('kind',['qq','assistant'])
+def test_interrupted_bounded_request_is_reclaimed_without_disabling_guard(system,monkeypatch,kind):
+    monkeypatch.setenv('AI_BUDGET_ENABLED','false');monkeypatch.setenv('AI_MAX_CONCURRENCY','1')
+    clock=['2026-11-03T10:00:00+08:00'];monkeypatch.setattr(ai_budget,'now',lambda:clock[0])
+    with system[1]() as db:
+        abandoned=ai_budget.reserve(db,'qq:A',kind)
+        clock[0]='2026-11-03T10:01:00+08:00'
+        with pytest.raises(__import__('fastapi').HTTPException):ai_budget.reserve(db,'new','qq')
+        clock[0]='2026-11-03T10:01:31+08:00'
+        assert ai_budget.status(db,'new')['inflight']==0
+        assert db.get(AiUsage,abandoned,populate_existing=True).status=='reserved'  # GET is read-only.
+        replacement=ai_budget.reserve(db,'new','qq')
+        assert replacement!=abandoned
+        assert db.get(AiUsage,abandoned,populate_existing=True).status=='cancelled'
+        assert ai_budget.status(db,'new')['inflight']==1
+
+
+def test_active_reservation_across_midnight_still_occupies_slot(system,monkeypatch):
+    monkeypatch.setenv('AI_BUDGET_ENABLED','false');monkeypatch.setenv('AI_MAX_CONCURRENCY','1')
+    clock=['2026-11-03T23:59:50+08:00'];monkeypatch.setattr(ai_budget,'now',lambda:clock[0])
+    with system[1]() as db:
+        ai_budget.reserve(db,'qq:A','qq');clock[0]='2026-11-04T00:00:05+08:00'
+        assert ai_budget.status(db,'qq:A')['inflight']==1
+        with pytest.raises(__import__('fastapi').HTTPException):ai_budget.reserve(db,'next','qq')
+
+
+def test_cancelled_assistant_releases_shared_ai_slot(system,monkeypatch):
+    import asyncio
+    from app import assistant
+    from app.models import User
+    monkeypatch.setenv('AI_BUDGET_ENABLED','false')
+    class CancelledProvider:
+        async def understand(self,*_):raise asyncio.CancelledError()
+    monkeypatch.setattr(assistant,'provider',lambda:CancelledProvider())
+    with system[1]() as db:
+        with pytest.raises(asyncio.CancelledError):asyncio.run(assistant.chat(db,db.get(User,'A'),assistant.ChatInput(message='今天有什么安排？')))
+        assert db.scalar(select(AiUsage).order_by(AiUsage.id.desc())).status=='cancelled'
+        assert ai_budget.status(db,'A')['inflight']==0
+
+
+def test_assistant_reports_busy_slot_instead_of_model_failure(system,monkeypatch):
+    import asyncio
+    from fastapi import HTTPException
+    from app import assistant
+    from app.models import User
+    monkeypatch.setenv('AI_BUDGET_ENABLED','false');monkeypatch.setenv('AI_MAX_CONCURRENCY','1')
+    class NeverCalledProvider:
+        async def understand(self,*_):raise AssertionError('No call while another request is active')
+    monkeypatch.setattr(assistant,'provider',lambda:NeverCalledProvider())
+    with system[1]() as db:
+        ai_budget.reserve(db,'other','qq')
+        with pytest.raises(HTTPException) as failure:asyncio.run(assistant.chat(db,db.get(User,'A'),assistant.ChatInput(message='今天有什么安排？')))
+        assert failure.value.status_code==429 and '正在处理' in failure.value.detail
