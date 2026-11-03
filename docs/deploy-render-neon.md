@@ -199,3 +199,53 @@ curl -X POST https://timesync-xxxx.onrender.com/api/admin/device-tokens \
 2. **免费实例 15 分钟休眠**：休眠后首个请求需 30–60 秒冷启动，脚本类验收要先把 `/api/health` 唤醒再跑，否则读超时。
 3. **`ADMIN_TOKEN` 可由 API 读回**：`GET /v1/services/{id}/env-vars` 能取到值（长度 44），因此无需人工复制；但不要把它写进任何文档或聊天记录。
 4. **签发设备凭据必须带 `owner_id`**：只传 `label` 会 422；`tools/issue_device_token.py --owner A` 已封装。
+
+---
+
+## 11. 升级到 2.1.7（2026-11-03）
+
+| 项目 | 值 |
+| --- | --- |
+| 代码 | `256fafd` → `b9600eb`，分支 `main` |
+| 版本 | TimeSync 2.1.7（助手、QQ 模块、PWA、schema v4） |
+| 构建 | 自动部署，约 72 秒进入 live |
+| 数据库 | Neon `neondb`，schema v2 → v4（新增迁移 3、4） |
+| 回退标记 | git tag `pre-2.1.7`、分支 `backup/pre-2.1.7`、旧部署 `dep-dbj14rnavr4c73biicd0` |
+
+**升级前备份**：`.pytest-tmp/upgrade/backup-20261103-192236/neon-logical-backup.json`
+（15 张表、121 行、27.2 KB，含 `schema_migrations` 记录）。
+
+**新增表**：`assistant_threads`、`assistant_proposals`、`qq_groups`、`qq_messages`、`qq_notices`。
+迁移只增不改，升级前后 `users=4 / tasks=12 / availability=56 / busy_intervals=20` 完全一致。
+
+**环境变量**（28 项，`DATABASE_URL` 与 `ADMIN_TOKEN` 原值保留）
+新增 `ASSISTANT_MODE=auto`、`ASSISTANT_AUTO_CREATE=true`、`ASSISTANT_TIMEOUT_SECONDS=60`、`AI_ADMIN_UI=false`；
+`AI_BUDGET_ENABLED=false`、`BOOTSTRAP_FIXTURES=false`（Blueprint 同步已生效）。
+`AI_API_KEY` 仍为空 → 助手运行在规则演示模式（`/api/v1/assistant/status` 返回 `mode=mock`）。
+
+**线上验收**
+
+| 检查 | 结果 |
+| --- | --- |
+| `/api/health`、`/api/ready` | 200，schema v4 = expected |
+| 基础 12 项（登录、ETag/304、设备只读、越权 403…） | 12/12 通过 |
+| 原有数据 | `revision=958f70e0…` 与升级前完全一致 |
+| AI 查询 | 200，回答引用真实日程「11-04 08:00–10:00 大学英语」 |
+| AI 新增 | 「添加明天20点到21点的高数复习」→ 已添加 11-04 20:00–21:00，日历可见 |
+| 多轮补充 | 先问「几点到几点」，补「20点到21点」后落库 11-05 20:00–21:00 |
+| 重试 | 同一 `request_id` 连发两次，仅生成 1 条 |
+| 排程 / 修复 | `POST /api/plans` 生成 plan 6；`/api/disruptions/preview` 200 |
+| 会议 | 候选人 17 个 → 创建 pending → A、B 均接受 → `confirmed` |
+| PWA | `/manifest.webmanifest`、`/sw.js`、图标均 200；首页引用新构建资源 |
+| QQ | `/api/v1/qq/status` 200；`live_enabled=false`、`account=null`（未接真实账号） |
+
+**验收数据清理**：临时可用时段、验收会议、测试事件、助手会话、`deploy-check` 凭据与
+全部沙箱会话均已删除；清理后 `revision` 回到升级前的 `958f70e0…`，两个真实设备凭据未受影响。
+
+**回退方法**
+
+1. 代码：`git revert b9600eb` 后推送，或在 Render 选择旧部署 `dep-dbj14rnavr4c73biicd0` 重新部署。
+2. 数据：v4 只新增表，旧代码读取 v4 不受影响；如需完全还原，用上面的 JSON 备份按表回灌。
+
+**仍未配置**：`AI_API_KEY`（真实 MiMo Key）为空，助手为规则演示；QQ 真实连接需要外部 NapCat 可公网访问，
+当前 `SANDBOX_MODE=true` 按设计强制关闭真实入口。

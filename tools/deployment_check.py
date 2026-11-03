@@ -73,7 +73,10 @@ print('checking', BASE)
 code, _, _ = call('GET', '/api/health')
 check('health 200', code == 200, str(code))
 code, _, raw = call('GET', '/api/ready')
-check('ready 200 + schema v2', code == 200 and json.loads(raw).get('schema_version') == 2, str(code))
+ready = json.loads(raw) if code == 200 else {}
+check('ready 200 + schema at expected version',
+      code == 200 and ready.get('schema_version') == ready.get('expected_schema_version'),
+      'v' + str(ready.get('schema_version')))
 code, _, raw = call('GET', '/api/auth/config')
 config = json.loads(raw) if code == 200 else {}
 check('auth/config advertises sandbox', code == 200 and config.get('sandbox_mode') is True, str(code))
